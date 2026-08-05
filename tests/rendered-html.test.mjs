@@ -1,0 +1,50 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+import {
+  PUZZLES,
+  getDailyPuzzle,
+  isAcceptedGuess,
+  normalizeGuess,
+} from "../lib/puzzles.ts";
+
+test("ships ten varied, fully authored playtest puzzles", () => {
+  assert.equal(PUZZLES.length, 10);
+  const structures = new Set(PUZZLES.map((puzzle) => puzzle.structure));
+  for (const expected of ["literal", "idiom", "rebus", "person", "story", "movie", "historical", "interpretive"]) {
+    assert.equal(structures.has(expected), true, `missing ${expected} puzzle`);
+  }
+  for (const puzzle of PUZZLES) {
+    assert.equal(puzzle.hints.length, 3);
+    assert.ok(puzzle.acceptedAnswers.length > 0);
+    assert.ok(puzzle.explanation.length > 30);
+  }
+});
+
+test("normalizes punctuation, casing, apostrophes, ampersands, and whitespace deterministically", () => {
+  assert.equal(normalizeGuess("  It’s  RAINING, cats & dogs! "), "its raining cats and dogs");
+  assert.equal(isAcceptedGuess(PUZZLES[0], "ITS raining, cats & dogs!"), true);
+  assert.equal(isAcceptedGuess(PUZZLES[0], "cloudy with a chance of meatballs"), false);
+});
+
+test("uses one shared UTC puzzle for the whole calendar day", () => {
+  const morning = getDailyPuzzle(new Date("2026-08-06T00:00:01Z"));
+  const evening = getDailyPuzzle(new Date("2026-08-06T23:59:59Z"));
+  assert.equal(morning.id, evening.id);
+  assert.equal(morning.number, 2);
+});
+
+test("keeps answers server-side and includes the complete interaction loop", async () => {
+  const [page, client, feedback] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/DailyPuzzle.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/feedback/route.ts", import.meta.url), "utf8"),
+  ]);
+  assert.doesNotMatch(page, /acceptedAnswers|answer:/);
+  assert.match(client, /Need a hint\?/);
+  assert.match(client, /Reveal answer/);
+  assert.match(client, /Share result/);
+  assert.match(client, /How was this puzzle\?/);
+  assert.match(feedback, /anonymousSessionId/);
+  assert.match(feedback, /metadataJson/);
+});
