@@ -191,6 +191,7 @@ export function normalizeGuess(value: string) {
   return value
     .normalize("NFKD")
     .toLocaleLowerCase("en")
+    .replace(/\p{M}+/gu, "")
     .replace(/[’‘`]/g, "'")
     .replace(/&/g, " and ")
     .replace(/[^a-z0-9\s']/g, " ")
@@ -199,9 +200,18 @@ export function normalizeGuess(value: string) {
     .trim();
 }
 
+function compactNormalizedGuess(value: string) {
+  return value.replace(/\s/g, "");
+}
+
 export function isAcceptedGuess(puzzle: Puzzle, guess: string) {
   const normalized = normalizeGuess(guess);
-  return puzzle.acceptedAnswers.some((answer) => normalizeGuess(answer) === normalized);
+  const compact = compactNormalizedGuess(normalized);
+
+  return puzzle.acceptedAnswers.some((answer) => {
+    const normalizedAnswer = normalizeGuess(answer);
+    return normalizedAnswer === normalized || compactNormalizedGuess(normalizedAnswer) === compact;
+  });
 }
 
 export function getPuzzleById(id: string) {

@@ -24,10 +24,32 @@ test("ships ten varied, fully authored playtest puzzles", () => {
   }
 });
 
-test("normalizes punctuation, casing, apostrophes, ampersands, and whitespace deterministically", () => {
+test("normalizes diacritics, punctuation, casing, apostrophes, ampersands, and whitespace deterministically", () => {
   assert.equal(normalizeGuess("  It’s  RAINING, cats & dogs! "), "its raining cats and dogs");
+  assert.equal(normalizeGuess("Víncent van Gogh"), "vincent van gogh");
   assert.equal(isAcceptedGuess(PUZZLES[0], "ITS raining, cats & dogs!"), true);
   assert.equal(isAcceptedGuess(PUZZLES[0], "cloudy with a chance of meatballs"), false);
+});
+
+test("accepts separator differences without accepting typos or semantic alternatives", () => {
+  for (const guess of ["Víncent van Gogh", "Vincent van-Gogh", "Vincent van—Gogh", "VincentvanGogh"]) {
+    assert.equal(isAcceptedGuess(PUZZLES[2], guess), true, `rejected ${guess}`);
+  }
+
+  assert.equal(isAcceptedGuess(PUZZLES[2], "Vincnet van Gogh"), false);
+  assert.equal(isAcceptedGuess(PUZZLES[9], "Think inside the box"), false);
+});
+
+test("keeps shortened and cultural spellings explicitly authored", () => {
+  assert.equal(isAcceptedGuess(PUZZLES[8], "Elvis"), true);
+
+  const spellingVariantPuzzle = {
+    ...PUZZLES[3],
+    answer: "Color theory",
+    acceptedAnswers: ["color theory", "colour theory"],
+  };
+  assert.equal(isAcceptedGuess(spellingVariantPuzzle, "colour theory"), true);
+  assert.equal(isAcceptedGuess(spellingVariantPuzzle, "collour theory"), false);
 });
 
 test("uses one shared UTC puzzle for the whole calendar day", () => {

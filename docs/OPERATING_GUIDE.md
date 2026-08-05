@@ -48,7 +48,9 @@ Play state is stored per puzzle in the browser. Normal daily results show the ti
 - `GAME_CONFIG.cycleAfterLastPuzzle` controls whether the set loops.
 - Guess and comment length limits are configurable there.
 
-The normalization function intentionally handles only case, Unicode form, apostrophes, punctuation, ampersands, and whitespace. It does not make semantic or fuzzy judgments.
+The normalization function deterministically handles case, Unicode compatibility and diacritics, apostrophes, punctuation, ampersands, whitespace, and separator differences. Missing spaces and hyphens are treated as formatting differences, so `van gogh`, `van-gogh`, and `vangogh` compare equally.
+
+Cultural spellings and other fair phrasings must remain explicit entries in `acceptedAnswers`. Misspellings, typos, and semantic alternatives are not automatically accepted; add a repeatedly missed fair answer as an authored variant rather than loosening the matcher globally.
 
 ## Feedback storage
 
