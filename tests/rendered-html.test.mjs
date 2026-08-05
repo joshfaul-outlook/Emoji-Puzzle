@@ -3,8 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   PUZZLES,
+  formatTimeUntilPuzzleLaunch,
   getDailyPuzzle,
   getNextPuzzle,
+  getNextPuzzleLaunchAt,
   isAcceptedGuess,
   normalizeGuess,
 } from "../lib/puzzles.ts";
@@ -40,6 +42,16 @@ test("advances through the playtest set and wraps after the final puzzle", () =>
   assert.equal(getNextPuzzle(PUZZLES.at(-1)).number, 1);
 });
 
+test("counts down to the next UTC puzzle launch in hours and minutes", () => {
+  const now = new Date("2026-12-31T22:54:30Z");
+  const launchAt = getNextPuzzleLaunchAt(now);
+  assert.equal(launchAt, Date.parse("2027-01-01T00:00:00Z"));
+  assert.equal(formatTimeUntilPuzzleLaunch(now.getTime(), launchAt), "1h 6m");
+  assert.equal(formatTimeUntilPuzzleLaunch(launchAt - 42 * 60_000, launchAt), "0h 42m");
+  assert.equal(formatTimeUntilPuzzleLaunch(launchAt - 1, launchAt), "0h 1m");
+  assert.equal(formatTimeUntilPuzzleLaunch(launchAt, launchAt), "0h 0m");
+});
+
 test("keeps answers server-side and includes the complete interaction loop", async () => {
   const [page, client, feedback, nextRoute, startOverRoute, schema] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
@@ -57,12 +69,18 @@ test("keeps answers server-side and includes the complete interaction loop", asy
   assert.match(client, /Messages/);
   assert.match(client, /Email/);
   assert.match(client, /Next puzzle/);
+  assert.match(client, /Next puzzle arrives in/);
+  assert.match(client, /sequenceMode && nextPuzzleNumber/);
+  assert.match(client, /window\.location\.replace\("\/"\)/);
   assert.match(client, /How was this puzzle\?/);
   assert.match(feedback, /anonymousSessionId/);
   assert.match(feedback, /metadataJson/);
   assert.doesNotMatch(`${client}\n${feedback}\n${schema}`, /elapsedSeconds|elapsed_seconds|startedAt|endedAt/);
+  assert.match(page, /sequenceMode=\{false\}/);
   assert.match(nextRoute, /getNextPuzzle/);
-  assert.match(nextRoute, /redirect/);
+  assert.match(nextRoute, /sequenceMode/);
+  assert.match(nextRoute, /nextPuzzleNumber/);
+  assert.doesNotMatch(nextRoute, /redirect/);
   assert.match(startOverRoute, /localStorage\.clear\(\)/);
   assert.match(startOverRoute, /sessionStorage\.clear\(\)/);
   assert.match(startOverRoute, /window\.location\.replace\("\/"\)/);

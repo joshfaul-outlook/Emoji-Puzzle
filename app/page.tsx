@@ -13,5 +13,5 @@ export default async function Home({ searchParams }: HomeProps) {
       ? getPuzzleByNumber(requestedPuzzle) ?? getDailyPuzzle()
       : getDailyPuzzle();
 
-  return <DailyPuzzle puzzle={toPublicPuzzle(selected)} />;
+  return <DailyPuzzle puzzle={toPublicPuzzle(selected)} sequenceMode={false} />;
 }

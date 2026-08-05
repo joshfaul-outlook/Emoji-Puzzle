@@ -113,4 +113,4 @@ Before promoting beyond a controlled playtest:
 6. Decide whether a tiny first-visit instruction or example is actually needed.
 7. Add a privacy note and error monitoring before broad promotion.
 
-The `/next` route deliberately bypasses daily scarcity for mechanics testing. Remove it before the daily ritual becomes the primary evaluation target.
+The `/next` route deliberately enables persistent sequence mode and bypasses daily scarcity for mechanics testing. Root and `?puzzle=N` results retain the daily wait. Remove `/next` before the daily ritual becomes the primary evaluation target.

@@ -37,7 +37,7 @@ For each puzzle, check:
 6. Positive and negative feedback with and without a comment.
 7. Refresh behavior after solve/reveal.
 
-Play state is stored per puzzle in the browser. Visit `/next` after a result to advance through the set, or visit `/startover` to clear device-local state and return to today’s puzzle.
+Play state is stored per puzzle in the browser. Normal daily results show the time remaining until the next 00:00 UTC launch. Visit `/next` to enter persistent sequence mode, where each completed puzzle can immediately advance through the authored set. Visit `/startover` to clear device-local state and return to today’s puzzle.
 
 ## Editing content and rules
 

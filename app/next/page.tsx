@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
-import { getDailyPuzzle, getNextPuzzle, getPuzzleByNumber } from "../../lib/puzzles";
+import { DailyPuzzle } from "../DailyPuzzle";
+import { getDailyPuzzle, getNextPuzzle, getPuzzleByNumber, toPublicPuzzle } from "../../lib/puzzles";
 
 type NextPuzzleProps = {
   searchParams: Promise<{ puzzle?: string }>;
@@ -8,11 +8,17 @@ type NextPuzzleProps = {
 export default async function NextPuzzle({ searchParams }: NextPuzzleProps) {
   const params = await searchParams;
   const requestedPuzzle = Number.parseInt(params.puzzle ?? "", 10);
-  const current =
+  const selected =
     Number.isInteger(requestedPuzzle) && requestedPuzzle >= 1
-      ? getPuzzleByNumber(requestedPuzzle) ?? getDailyPuzzle()
-      : getDailyPuzzle();
-  const next = getNextPuzzle(current);
+      ? getPuzzleByNumber(requestedPuzzle) ?? getNextPuzzle(getDailyPuzzle())
+      : getNextPuzzle(getDailyPuzzle());
+  const next = getNextPuzzle(selected);
 
-  redirect(`/?puzzle=${next.number}`);
+  return (
+    <DailyPuzzle
+      puzzle={toPublicPuzzle(selected)}
+      sequenceMode
+      nextPuzzleNumber={next.number}
+    />
+  );
 }

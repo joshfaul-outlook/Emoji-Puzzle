@@ -2,7 +2,11 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import type { PublicPuzzle } from "../lib/puzzles";
+import {
+  formatTimeUntilPuzzleLaunch,
+  getNextPuzzleLaunchAt,
+  type PublicPuzzle,
+} from "../lib/puzzles";
 
 type Resolution = {
   answer: string;
@@ -40,7 +44,13 @@ function freshPlay(): PlayState {
   };
 }
 
-export function DailyPuzzle({ puzzle }: { puzzle: PublicPuzzle }) {
+type DailyPuzzleProps = {
+  puzzle: PublicPuzzle;
+  sequenceMode: boolean;
+  nextPuzzleNumber?: number;
+};
+
+export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuzzleProps) {
   const storageKey = `emoji-daily-play:${puzzle.id}`;
   const [play, setPlay] = useState<PlayState>(() => freshPlay());
   const [guess, setGuess] = useState("");
@@ -48,6 +58,7 @@ export function DailyPuzzle({ puzzle }: { puzzle: PublicPuzzle }) {
   const [busy, setBusy] = useState(false);
   const [confirmReveal, setConfirmReveal] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [nextPuzzleCountdown, setNextPuzzleCountdown] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "shared" | "copied" | "error">("idle");
   const [nativeSharingAvailable, setNativeSharingAvailable] = useState(false);
@@ -56,6 +67,7 @@ export function DailyPuzzle({ puzzle }: { puzzle: PublicPuzzle }) {
   const [feedbackState, setFeedbackState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const inputRef = useRef<HTMLInputElement>(null);
   const sharePanelRef = useRef<HTMLDivElement>(null);
+  const isFinished = play.outcome !== "playing" && play.resolution !== null;
 
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);
@@ -105,6 +117,24 @@ export function DailyPuzzle({ puzzle }: { puzzle: PublicPuzzle }) {
       previousFocus?.focus();
     };
   }, [shareOpen]);
+
+  useEffect(() => {
+    if (!isFinished || sequenceMode) return;
+    const nextLaunchAt = getNextPuzzleLaunchAt();
+
+    const updateCountdown = () => {
+      const currentTime = Date.now();
+      if (currentTime >= nextLaunchAt) {
+        window.location.replace("/");
+        return;
+      }
+      setNextPuzzleCountdown(formatTimeUntilPuzzleLaunch(currentTime, nextLaunchAt));
+    };
+
+    updateCountdown();
+    const interval = window.setInterval(updateCountdown, 1_000);
+    return () => window.clearInterval(interval);
+  }, [isFinished, sequenceMode]);
 
   async function submitGuess(event: FormEvent) {
     event.preventDefault();
@@ -305,8 +335,6 @@ export function DailyPuzzle({ puzzle }: { puzzle: PublicPuzzle }) {
     }
   }
 
-  const isFinished = play.outcome !== "playing" && play.resolution;
-
   return (
     <main className="game-shell">
       <header className="topbar">
@@ -412,9 +440,16 @@ export function DailyPuzzle({ puzzle }: { puzzle: PublicPuzzle }) {
           <button className="share-button" type="button" onClick={openShareSheet}>
             <span aria-hidden="true">↗</span> Share result
           </button>
-          <Link className="next-button" href={`/next?puzzle=${puzzle.number}`}>
-            Next puzzle <span aria-hidden="true">→</span>
-          </Link>
+          {sequenceMode && nextPuzzleNumber ? (
+            <Link className="next-button" href={`/next?puzzle=${nextPuzzleNumber}`}>
+              Next puzzle <span aria-hidden="true">→</span>
+            </Link>
+          ) : (
+            <div className="next-release">
+              <span>Next puzzle arrives in</span>
+              <strong role="timer">{nextPuzzleCountdown || "…"}</strong>
+            </div>
+          )}
 
           <aside className="feedback-card">
             {play.feedbackSent || feedbackState === "sent" ? (

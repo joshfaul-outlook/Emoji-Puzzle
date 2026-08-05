@@ -217,6 +217,17 @@ export function getNextPuzzle(puzzle: Puzzle) {
   return PUZZLES[(index + 1) % PUZZLES.length];
 }
 
+export function getNextPuzzleLaunchAt(now = new Date()) {
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+}
+
+export function formatTimeUntilPuzzleLaunch(now: number, launchAt: number) {
+  const totalMinutes = Math.ceil(Math.max(0, launchAt - now) / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h ${minutes}m`;
+}
+
 export function getDailyPuzzle(now = new Date()) {
   const launch = Date.parse(`${GAME_CONFIG.launchDate}T00:00:00Z`);
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
