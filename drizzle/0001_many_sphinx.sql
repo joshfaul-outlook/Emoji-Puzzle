@@ -1,0 +1,1 @@
+ALTER TABLE `puzzle_feedback` DROP COLUMN `elapsed_seconds`;

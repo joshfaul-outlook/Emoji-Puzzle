@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   PUZZLES,
   getDailyPuzzle,
+  getNextPuzzle,
   isAcceptedGuess,
   normalizeGuess,
 } from "../lib/puzzles.ts";
@@ -34,17 +35,35 @@ test("uses one shared UTC puzzle for the whole calendar day", () => {
   assert.equal(morning.number, 2);
 });
 
+test("advances through the playtest set and wraps after the final puzzle", () => {
+  assert.equal(getNextPuzzle(PUZZLES[0]).number, 2);
+  assert.equal(getNextPuzzle(PUZZLES.at(-1)).number, 1);
+});
+
 test("keeps answers server-side and includes the complete interaction loop", async () => {
-  const [page, client, feedback] = await Promise.all([
+  const [page, client, feedback, nextRoute, startOverRoute, schema] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/DailyPuzzle.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/feedback/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/next/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/startover/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
   ]);
   assert.doesNotMatch(page, /acceptedAnswers|answer:/);
   assert.match(client, /Need a hint\?/);
   assert.match(client, /Reveal answer/);
   assert.match(client, /Share result/);
+  assert.match(client, /Copy link/);
+  assert.match(client, /Messages/);
+  assert.match(client, /Email/);
+  assert.match(client, /Next puzzle/);
   assert.match(client, /How was this puzzle\?/);
   assert.match(feedback, /anonymousSessionId/);
   assert.match(feedback, /metadataJson/);
+  assert.doesNotMatch(`${client}\n${feedback}\n${schema}`, /elapsedSeconds|elapsed_seconds|startedAt|endedAt/);
+  assert.match(nextRoute, /getNextPuzzle/);
+  assert.match(nextRoute, /redirect/);
+  assert.match(startOverRoute, /localStorage\.clear\(\)/);
+  assert.match(startOverRoute, /sessionStorage\.clear\(\)/);
+  assert.match(startOverRoute, /window\.location\.replace\("\/"\)/);
 });

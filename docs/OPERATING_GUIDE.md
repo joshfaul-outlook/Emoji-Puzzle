@@ -33,11 +33,11 @@ For each puzzle, check:
 2. A clearly wrong answer.
 3. All three hints in order.
 4. Reveal confirmation and result explanation.
-5. Solve statistics and spoiler-free share text.
+5. Solve statistics and spoiler-free sharing through messages, email, copy-link, and the native share menu.
 6. Positive and negative feedback with and without a comment.
 7. Refresh behavior after solve/reveal.
 
-Play state is stored per puzzle in the browser. Clear the site’s local storage to reset a device during testing.
+Play state is stored per puzzle in the browser. Visit `/next` after a result to advance through the set, or visit `/startover` to clear device-local state and return to today’s puzzle.
 
 ## Editing content and rules
 
@@ -61,7 +61,7 @@ Each row contains:
 - server timestamp;
 - per-play and anonymous device-session identifiers;
 - solved/revealed outcome;
-- elapsed time, guesses, and hints;
+- guesses and hints;
 - compact context: UTC play date, locale, timezone, viewport, pixel ratio, and reduced-motion preference.
 
 Do not add direct identifiers or reuse the anonymous session id outside this product.

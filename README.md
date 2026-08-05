@@ -17,8 +17,9 @@ The product is built around one question: can we repeatedly create puzzles that 
 - Progressive authored hints, one at a time
 - Explicit reveal/give-up flow
 - Explanation-led solve and reveal states
-- Elapsed time, guesses, and hints without a numeric score
-- Spoiler-free native sharing or clipboard fallback
+- Guesses and hints without a numeric score or timer
+- Spoiler-free sharing through messages, email, copy-link, and the native share menu
+- Temporary `/next` and `/startover` routes for rapid mechanics testing
 - Thumbs up/down feedback with an optional note
 - Durable anonymous raw feedback for later analysis
 - Device-local play continuity

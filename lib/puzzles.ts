@@ -212,6 +212,11 @@ export function getPuzzleByNumber(number: number) {
   return PUZZLES.find((puzzle) => puzzle.number === number);
 }
 
+export function getNextPuzzle(puzzle: Puzzle) {
+  const index = PUZZLES.findIndex((candidate) => candidate.id === puzzle.id);
+  return PUZZLES[(index + 1) % PUZZLES.length];
+}
+
 export function getDailyPuzzle(now = new Date()) {
   const launch = Date.parse(`${GAME_CONFIG.launchDate}T00:00:00Z`);
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());

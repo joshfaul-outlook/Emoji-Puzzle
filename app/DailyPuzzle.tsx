@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { PublicPuzzle } from "../lib/puzzles";
 
@@ -14,8 +14,6 @@ type Outcome = "playing" | "solved" | "revealed";
 
 type PlayState = {
   playId: string;
-  startedAt: number;
-  endedAt: number | null;
   guessCount: number;
   hints: string[];
   outcome: Outcome;
@@ -34,31 +32,12 @@ function createId() {
 function freshPlay(): PlayState {
   return {
     playId: createId(),
-    startedAt: Date.now(),
-    endedAt: null,
     guessCount: 0,
     hints: [],
     outcome: "playing",
     resolution: null,
     feedbackSent: false,
   };
-}
-
-function formatElapsed(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-function timeUntilTomorrow(now: number) {
-  const current = new Date(now);
-  const midnight = Date.UTC(
-    current.getUTCFullYear(),
-    current.getUTCMonth(),
-    current.getUTCDate() + 1,
-  );
-  const minutes = Math.max(0, Math.floor((midnight - now) / 60_000));
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
 export function DailyPuzzle({ puzzle }: { puzzle: PublicPuzzle }) {
@@ -68,13 +47,15 @@ export function DailyPuzzle({ puzzle }: { puzzle: PublicPuzzle }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirmReveal, setConfirmReveal] = useState(false);
-  const [now, setNow] = useState(0);
   const [hydrated, setHydrated] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "shared" | "copied" | "error">("idle");
+  const [nativeSharingAvailable, setNativeSharingAvailable] = useState(false);
   const [rating, setRating] = useState<"up" | "down" | null>(null);
   const [comment, setComment] = useState("");
   const [feedbackState, setFeedbackState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const inputRef = useRef<HTMLInputElement>(null);
+  const sharePanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);
@@ -89,7 +70,7 @@ export function DailyPuzzle({ puzzle }: { puzzle: PublicPuzzle }) {
         setPlay(restored);
       }
       setHydrated(true);
-      setNow(Date.now());
+      setNativeSharingAvailable(typeof navigator.share === "function");
     }, 0);
     return () => window.clearTimeout(task);
   }, [storageKey]);
@@ -99,18 +80,31 @@ export function DailyPuzzle({ puzzle }: { puzzle: PublicPuzzle }) {
   }, [hydrated, play, storageKey]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (hydrated && play.outcome === "playing") inputRef.current?.focus();
+    if (
+      hydrated &&
+      play.outcome === "playing" &&
+      window.matchMedia("(pointer: fine)").matches
+    ) {
+      inputRef.current?.focus();
+    }
   }, [hydrated, play.outcome]);
 
-  const elapsedSeconds = useMemo(() => {
-    const end = play.endedAt ?? now;
-    return Math.max(0, Math.floor((end - play.startedAt) / 1_000));
-  }, [now, play.endedAt, play.startedAt]);
+  useEffect(() => {
+    if (!shareOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShareOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+    window.setTimeout(() => sharePanelRef.current?.querySelector<HTMLButtonElement>("button")?.focus(), 0);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [shareOpen]);
 
   async function submitGuess(event: FormEvent) {
     event.preventDefault();
@@ -136,7 +130,6 @@ export function DailyPuzzle({ puzzle }: { puzzle: PublicPuzzle }) {
           ...current,
           guessCount: nextGuessCount,
           outcome: "solved",
-          endedAt: Date.now(),
           resolution: data.resolution ?? null,
         }));
         setMessage("");
@@ -188,7 +181,6 @@ export function DailyPuzzle({ puzzle }: { puzzle: PublicPuzzle }) {
         setPlay((current) => ({
           ...current,
           outcome: "revealed",
-          endedAt: Date.now(),
           resolution: data.resolution ?? null,
         }));
       }
@@ -200,32 +192,73 @@ export function DailyPuzzle({ puzzle }: { puzzle: PublicPuzzle }) {
     }
   }
 
-  async function shareResult() {
+  function dailyUrl() {
+    return new URL("/", window.location.origin).toString();
+  }
+
+  function shareText() {
+    if (play.outcome === "playing") {
+      return "Can you decode today’s Emoji Daily?";
+    }
     const solved = play.outcome === "solved";
-    const result = [
+    return [
       `Emoji Daily #${puzzle.number}`,
       `${solved ? "🟩 Solved" : "⬜ Revealed"} · ${play.guessCount} ${play.guessCount === 1 ? "guess" : "guesses"} · ${play.hints.length} ${play.hints.length === 1 ? "hint" : "hints"}`,
-      `⏱ ${formatElapsed(elapsedSeconds)}`,
-      window.location.origin,
+      "Can you decode today’s puzzle?",
     ].join("\n");
+  }
+
+  function openShareSheet() {
+    setShareState("idle");
+    setShareOpen(true);
+  }
+
+  async function shareWithDevice() {
+    if (!navigator.share) return;
 
     try {
-      if (navigator.share) {
-        await navigator.share({ title: `Emoji Daily #${puzzle.number}`, text: result });
-        setShareState("shared");
-      } else {
-        await navigator.clipboard.writeText(result);
-        setShareState("copied");
-      }
+      await navigator.share({
+        title: `Emoji Daily #${puzzle.number}`,
+        text: shareText(),
+        url: dailyUrl(),
+      });
+      setShareState("shared");
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
-      try {
-        await navigator.clipboard.writeText(result);
-        setShareState("copied");
-      } catch {
-        setShareState("error");
-      }
+      setShareState("error");
     }
+  }
+
+  async function copyShareLink() {
+    try {
+      const url = dailyUrl();
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const temporaryInput = document.createElement("textarea");
+        temporaryInput.value = url;
+        temporaryInput.style.position = "fixed";
+        temporaryInput.style.opacity = "0";
+        document.body.appendChild(temporaryInput);
+        temporaryInput.select();
+        const copied = document.execCommand("copy");
+        temporaryInput.remove();
+        if (!copied) throw new Error("copy failed");
+      }
+      setShareState("copied");
+    } catch {
+      setShareState("error");
+    }
+  }
+
+  function shareByMessage() {
+    window.location.href = `sms:?&body=${encodeURIComponent(`${shareText()}\n${dailyUrl()}`)}`;
+  }
+
+  function shareByEmail() {
+    const subject = encodeURIComponent(`Try Emoji Daily #${puzzle.number}`);
+    const body = encodeURIComponent(`${shareText()}\n\n${dailyUrl()}`);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
   }
 
   function getAnonymousSessionId() {
@@ -252,11 +285,10 @@ export function DailyPuzzle({ puzzle }: { puzzle: PublicPuzzle }) {
           playId: play.playId,
           anonymousSessionId: getAnonymousSessionId(),
           outcome: play.outcome,
-          elapsedSeconds,
           guessCount: play.guessCount,
           hintCount: play.hints.length,
           metadata: {
-            playedDateUtc: new Date(play.startedAt).toISOString().slice(0, 10),
+            playedDateUtc: new Date().toISOString().slice(0, 10),
             locale: navigator.language,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             viewport: `${window.innerWidth}x${window.innerHeight}`,
@@ -282,7 +314,13 @@ export function DailyPuzzle({ puzzle }: { puzzle: PublicPuzzle }) {
           <span className="brand-mark" aria-hidden="true">◒</span>
           <span>Emoji Daily</span>
         </Link>
-        <div className="day-pill">Puzzle #{puzzle.number}</div>
+        <div className="topbar-actions">
+          <button className="topbar-share" type="button" onClick={openShareSheet} aria-label="Share Emoji Daily">
+            <span aria-hidden="true">↗</span>
+            <span>Share</span>
+          </button>
+          <div className="day-pill">Puzzle #{puzzle.number}</div>
+        </div>
       </header>
 
       {!isFinished ? (
@@ -369,20 +407,14 @@ export function DailyPuzzle({ puzzle }: { puzzle: PublicPuzzle }) {
           <div className="result-stats" aria-label="Your result">
             <div><strong>{play.guessCount}</strong><span>{play.guessCount === 1 ? "guess" : "guesses"}</span></div>
             <div><strong>{play.hints.length}</strong><span>{play.hints.length === 1 ? "hint" : "hints"}</span></div>
-            <div><strong>{formatElapsed(elapsedSeconds)}</strong><span>time</span></div>
           </div>
 
-          <button className="share-button" type="button" onClick={shareResult}>
+          <button className="share-button" type="button" onClick={openShareSheet}>
             <span aria-hidden="true">↗</span> Share result
           </button>
-          <p className="share-status" aria-live="polite">
-            {shareState === "copied" && "Spoiler-free result copied!"}
-            {shareState === "shared" && "Thanks for sharing!"}
-            {shareState === "error" && "Couldn’t share this time."}
-          </p>
-
-          <div className="tomorrow-rule" />
-          <p className="tomorrow">A new puzzle arrives in <strong>{timeUntilTomorrow(now)}</strong></p>
+          <Link className="next-button" href={`/next?puzzle=${puzzle.number}`}>
+            Next puzzle <span aria-hidden="true">→</span>
+          </Link>
 
           <aside className="feedback-card">
             {play.feedbackSent || feedbackState === "sent" ? (
@@ -413,6 +445,37 @@ export function DailyPuzzle({ puzzle }: { puzzle: PublicPuzzle }) {
             )}
           </aside>
         </section>
+      )}
+
+      {shareOpen && (
+        <div className="share-overlay" role="presentation" onPointerDown={(event) => {
+          if (event.target === event.currentTarget) setShareOpen(false);
+        }}>
+          <div className="share-sheet" ref={sharePanelRef} role="dialog" aria-modal="true" aria-labelledby="share-title">
+            <div className="share-handle" aria-hidden="true" />
+            <div className="share-heading">
+              <div>
+                <div className="eyebrow">Invite someone</div>
+                <h2 id="share-title">Share today’s puzzle</h2>
+              </div>
+              <button className="share-close" type="button" onClick={() => setShareOpen(false)} aria-label="Close share options">×</button>
+            </div>
+            <p className="share-description">The link opens the daily puzzle. Your answer and emojis stay private.</p>
+            <div className="share-options">
+              <button type="button" onClick={shareByMessage}><span aria-hidden="true">💬</span><strong>Messages</strong></button>
+              <button type="button" onClick={shareByEmail}><span aria-hidden="true">✉️</span><strong>Email</strong></button>
+              <button type="button" onClick={copyShareLink}><span aria-hidden="true">🔗</span><strong>Copy link</strong></button>
+              {nativeSharingAvailable && (
+                <button type="button" onClick={shareWithDevice}><span aria-hidden="true">•••</span><strong>More apps</strong></button>
+              )}
+            </div>
+            <p className="share-status" aria-live="polite">
+              {shareState === "copied" && "Daily puzzle link copied!"}
+              {shareState === "shared" && "Thanks for sharing!"}
+              {shareState === "error" && "Couldn’t share this time. Please try again."}
+            </p>
+          </div>
+        </div>
       )}
 
       <footer>

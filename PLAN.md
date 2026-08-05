@@ -10,10 +10,11 @@ The repository begins with a usable mechanics prototype:
 - server-side answer checking with explicit variants;
 - unlimited guesses and three progressive hints;
 - explicit give-up/reveal and an explanation-led result;
-- elapsed time, guess count, and hint count;
-- spoiler-free sharing;
+- guess count and hint count;
+- spoiler-free sharing through messaging, email, copy-link, and native share options;
 - durable thumbs up/down feedback with optional notes;
 - device-local play continuity and anonymous metadata;
+- temporary `/next` and `/startover` playtest routes for rapid iteration;
 - a public deployment path.
 
 This baseline is intentionally small. The next work is product learning, not feature accumulation.
@@ -104,10 +105,12 @@ Before promoting beyond a controlled playtest:
 
 ## Near-term backlog
 
-1. Run an internal ten-puzzle playtest using direct `?puzzle=1`–`10` links.
+1. Run an internal ten-puzzle playtest using the temporary `/next` route; use `/startover` to simulate a new player.
 2. Review raw feedback after every five players or every three days, whichever comes first.
 3. Fix accepted variants and wording without changing multiple mechanics at once.
 4. Replace the two weakest puzzles before expanding the set.
 5. Author puzzles 11–15 using the strongest two structures plus one deliberate experiment.
 6. Decide whether a tiny first-visit instruction or example is actually needed.
 7. Add a privacy note and error monitoring before broad promotion.
+
+The `/next` route deliberately bypasses daily scarcity for mechanics testing. Remove it before the daily ritual becomes the primary evaluation target.

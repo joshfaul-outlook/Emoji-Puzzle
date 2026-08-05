@@ -9,7 +9,6 @@ type FeedbackPayload = {
   playId?: string;
   anonymousSessionId?: string;
   outcome?: "solved" | "revealed";
-  elapsedSeconds?: number;
   guessCount?: number;
   hintCount?: number;
   metadata?: Record<string, unknown>;
@@ -49,7 +48,6 @@ export async function POST(request: Request) {
       playId: payload.playId.slice(0, 80),
       anonymousSessionId: payload.anonymousSessionId.slice(0, 80),
       outcome: payload.outcome as "solved" | "revealed",
-      elapsedSeconds: cleanCount(payload.elapsedSeconds, 86_400),
       guessCount: cleanCount(payload.guessCount, 1_000),
       hintCount: cleanCount(payload.hintCount, 20),
       metadataJson: JSON.stringify(payload.metadata ?? {}).slice(0, 2_000),

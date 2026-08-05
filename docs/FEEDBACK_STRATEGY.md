@@ -14,7 +14,7 @@ The initial questions are:
 
 ## What is captured now
 
-After solve or reveal, a player can select thumbs up or down and optionally explain why. The record includes the puzzle, outcome, elapsed time, guess count, hints used, timestamp, and limited anonymous device context.
+After solve or reveal, a player can select thumbs up or down and optionally explain why. The record includes the puzzle, outcome, guess count, hints used, timestamp, and limited anonymous device context.
 
 This combines explicit sentiment with enough play context to interpret it. It intentionally does not produce a universal score.
 
@@ -27,7 +27,7 @@ For each puzzle, summarize:
 - positive and negative ratings;
 - solved versus revealed outcomes;
 - typical hint depth;
-- guess-count and elapsed-time range;
+- guess-count range;
 - recurring comment themes;
 - missed but fair answer variants;
 - one recommended action: keep, revise, replace, or retest.
@@ -54,7 +54,6 @@ Use a small manual vocabulary when collating notes:
 - High positive ratings with low hint use may indicate a good easy puzzle, not automatically an overly easy one.
 - High reveal rates plus positive comments may indicate a hard but satisfying puzzle.
 - Repeated variant misses are an acceptance-list problem; competing intended answers are a puzzle-design problem.
-- Long elapsed time is only meaningful with outcome, hint use, and comments.
 - Sharing is a useful engagement signal, but lack of sharing does not make a puzzle bad.
 
 ## Experiment discipline

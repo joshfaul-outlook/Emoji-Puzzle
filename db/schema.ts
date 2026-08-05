@@ -11,7 +11,6 @@ export const puzzleFeedback = sqliteTable("puzzle_feedback", {
   playId: text("play_id").notNull(),
   anonymousSessionId: text("anonymous_session_id").notNull(),
   outcome: text("outcome", { enum: ["solved", "revealed"] }).notNull(),
-  elapsedSeconds: integer("elapsed_seconds").notNull(),
   guessCount: integer("guess_count").notNull(),
   hintCount: integer("hint_count").notNull(),
   metadataJson: text("metadata_json").notNull(),

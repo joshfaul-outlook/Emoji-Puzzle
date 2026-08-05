@@ -8,6 +8,13 @@
       "when": 1785954054403,
       "tag": "0000_next_sphinx",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1785969886006,
+      "tag": "0001_many_sphinx",
+      "breakpoints": true
     }
   ]
 }

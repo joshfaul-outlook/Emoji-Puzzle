@@ -8,7 +8,6 @@ export type FeedbackRecord = {
   playId: string;
   anonymousSessionId: string;
   outcome: "solved" | "revealed";
-  elapsedSeconds: number;
   guessCount: number;
   hintCount: number;
   metadataJson: string;
@@ -25,7 +24,6 @@ const CREATE_FEEDBACK_TABLE = `
     play_id TEXT NOT NULL,
     anonymous_session_id TEXT NOT NULL,
     outcome TEXT NOT NULL CHECK (outcome IN ('solved', 'revealed')),
-    elapsed_seconds INTEGER NOT NULL,
     guess_count INTEGER NOT NULL,
     hint_count INTEGER NOT NULL,
     metadata_json TEXT NOT NULL
@@ -38,9 +36,9 @@ export async function insertFeedback(record: FeedbackRecord) {
   await env.DB.prepare(
     `INSERT INTO puzzle_feedback (
       puzzle_id, puzzle_number, rating, comment, play_id,
-      anonymous_session_id, outcome, elapsed_seconds, guess_count,
+      anonymous_session_id, outcome, guess_count,
       hint_count, metadata_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       record.puzzleId,
@@ -50,7 +48,6 @@ export async function insertFeedback(record: FeedbackRecord) {
       record.playId,
       record.anonymousSessionId,
       record.outcome,
-      record.elapsedSeconds,
       record.guessCount,
       record.hintCount,
       record.metadataJson,
