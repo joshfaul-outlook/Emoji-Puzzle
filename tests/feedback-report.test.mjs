@@ -6,10 +6,7 @@ import {
   getFeedbackReport,
   parseFeedbackReportFilters,
 } from "../lib/feedback-report.ts";
-import {
-  isFeedbackReviewer,
-  parseFeedbackReviewerEmails,
-} from "../lib/feedback-review-auth.ts";
+import { isFeedbackReviewer } from "../lib/feedback-review-auth.ts";
 
 const CREATE_TABLE = `CREATE TABLE puzzle_feedback (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -135,15 +132,10 @@ test("returns a safe empty report before the feedback table exists", async () =>
   });
 });
 
-test("authorizes only configured reviewer emails, case-insensitively", () => {
-  const configured = "owner@example.com, second@example.com";
-  assert.deepEqual([...parseFeedbackReviewerEmails(configured)], [
-    "owner@example.com",
-    "second@example.com",
-  ]);
-  assert.equal(isFeedbackReviewer("Owner@Example.com", configured), true);
-  assert.equal(isFeedbackReviewer("visitor@example.com", configured), false);
-  assert.equal(isFeedbackReviewer("owner@example.com", undefined), false);
+test("authorizes only the owner's email, case-insensitively", () => {
+  assert.equal(isFeedbackReviewer("Josh.Faul@Outlook.com"), true);
+  assert.equal(isFeedbackReviewer("visitor@example.com"), false);
+  assert.equal(isFeedbackReviewer(""), false);
 });
 
 async function withFixtureDatabase(callback) {
