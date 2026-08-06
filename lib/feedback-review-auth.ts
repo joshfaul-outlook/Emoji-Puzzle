@@ -1,12 +1,5 @@
-export function parseFeedbackReviewerEmails(value: string | undefined): Set<string> {
-  return new Set(
-    (value ?? "")
-      .split(",")
-      .map((email) => email.trim().toLocaleLowerCase("en"))
-      .filter(Boolean),
-  );
-}
+export const FEEDBACK_REVIEWER_EMAIL = "josh.faul@outlook.com";
 
-export function isFeedbackReviewer(email: string, configuredEmails: string | undefined): boolean {
-  return parseFeedbackReviewerEmails(configuredEmails).has(email.trim().toLocaleLowerCase("en"));
+export function isFeedbackReviewer(email: string): boolean {
+  return email.trim().toLocaleLowerCase("en") === FEEDBACK_REVIEWER_EMAIL;
 }
