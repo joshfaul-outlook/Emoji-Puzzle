@@ -12,6 +12,7 @@ export type Puzzle = {
 
 export type PublicPuzzle = Pick<Puzzle, "id" | "number" | "emoji"> & {
   hintCount: number;
+  dateCode: string;
 };
 
 export const GAME_CONFIG = {
@@ -1598,12 +1599,19 @@ export function getDailyPuzzle(now = new Date()) {
   return PUZZLES[index];
 }
 
+export function getPuzzleDateCode(puzzle: Pick<Puzzle, "number">) {
+  const launch = Date.parse(`${GAME_CONFIG.launchDate}T00:00:00Z`);
+  const scheduledDate = new Date(launch + (puzzle.number - 1) * 86_400_000);
+  return scheduledDate.toISOString().slice(2, 10).replace(/-/g, "");
+}
+
 export function toPublicPuzzle(puzzle: Puzzle): PublicPuzzle {
   return {
     id: puzzle.id,
     number: puzzle.number,
     emoji: puzzle.emoji,
     hintCount: puzzle.hints.length,
+    dateCode: getPuzzleDateCode(puzzle),
   };
 }
 
