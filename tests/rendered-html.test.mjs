@@ -7,8 +7,10 @@ import {
   getDailyPuzzle,
   getNextPuzzle,
   getNextPuzzleLaunchAt,
+  getPuzzleDateCode,
   isAcceptedGuess,
   normalizeGuess,
+  toPublicPuzzle,
 } from "../lib/puzzles.ts";
 
 test("ships 100 varied, fully authored puzzles for the U.S. public test", () => {
@@ -68,6 +70,12 @@ test("uses one shared UTC puzzle for the whole calendar day", () => {
   assert.equal(morning.number, 2);
 });
 
+test("derives the public YYMMDD code from each puzzle's scheduled UTC date", () => {
+  assert.equal(getPuzzleDateCode(PUZZLES[0]), "260805");
+  assert.equal(getPuzzleDateCode(PUZZLES[1]), "260806");
+  assert.equal(toPublicPuzzle(PUZZLES[0]).dateCode, "260805");
+});
+
 test("advances through the playtest set and wraps after the final puzzle", () => {
   assert.equal(getNextPuzzle(PUZZLES[0]).number, 2);
   assert.equal(getNextPuzzle(PUZZLES.at(-1)).number, 1);
@@ -104,6 +112,7 @@ test("keeps answers server-side and includes the complete interaction loop", asy
   assert.match(client, /sequenceMode && nextPuzzleNumber/);
   assert.match(client, /window\.location\.replace\("\/"\)/);
   assert.match(client, /How was this puzzle\?/);
+  assert.match(client, /PUZZLE #\{puzzle\.dateCode\}/);
   assert.match(feedback, /anonymousSessionId/);
   assert.match(feedback, /metadataJson/);
   assert.doesNotMatch(`${client}\n${feedback}\n${schema}`, /elapsedSeconds|elapsed_seconds|startedAt|endedAt/);
