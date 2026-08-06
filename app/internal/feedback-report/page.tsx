@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { env } from "cloudflare:workers";
 import { chatGPTSignOutPath, requireChatGPTUser } from "../../chatgpt-auth";
 import { loadFeedbackReport } from "../../../db/feedback-report";
 import { isFeedbackReviewer } from "../../../lib/feedback-review-auth";
@@ -40,9 +39,7 @@ async function ProtectedFeedbackReport({
   filters: ReturnType<typeof parseFeedbackReportFilters>;
 }) {
   const user = await requireChatGPTUser(returnTo);
-  const reviewerEmails = (env as unknown as { FEEDBACK_REVIEWER_EMAILS?: string })
-    .FEEDBACK_REVIEWER_EMAILS;
-  if (!isFeedbackReviewer(user.email, reviewerEmails)) notFound();
+  if (!isFeedbackReviewer(user.email)) notFound();
 
   const report = await loadFeedbackReport(filters);
   const selectedPuzzle = filters.puzzleNumber === null
