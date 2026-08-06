@@ -49,7 +49,7 @@ We are looking for directional evidence, not a composite score:
 
 ## Playtest set
 
-The 100-puzzle public-test pool intentionally covers literal translation, idioms, rebus logic, American places and history, famous people, books, movies, music, television, food, sports, holidays, and interpretive questions. The references are selected for broad recognition by a U.S. audience. The set remains experimental inventory: feedback should determine which puzzles stay in the daily rotation and which need revision or replacement.
+The 100-puzzle public-test pool intentionally covers literal translation, idioms, rebus logic, American places and history, famous people, books, movies, music, television, food, sports, holidays, and interpretive questions. The references are selected for broad recognition by a U.S. audience. This is authored inventory, not a claim that all 100 puzzles are reviewed or scheduled: blind testing and feedback determine which subsets are approved for the daily rotation and which need revision or replacement.
 
 ## Non-goals
 

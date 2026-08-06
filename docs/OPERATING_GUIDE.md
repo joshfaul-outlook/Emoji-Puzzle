@@ -21,11 +21,11 @@ npm run lint
 npm test
 ```
 
-The automated tests cover the ten-puzzle content contract, structure variety, deterministic normalization, accepted and rejected guesses, shared UTC rotation, server-side answer isolation, and the presence of the complete interaction loop.
+The automated tests cover the 100-puzzle content contract, structure variety, deterministic normalization, accepted and rejected guesses, shared UTC rotation, per-puzzle client-state isolation, server-side answer isolation, and the complete interaction loop.
 
 ## Testing individual puzzles
 
-Append `?puzzle=N` to the URL, where `N` is 1 through 10. This is a playtest aid and does not change the shared daily rotation.
+Append `?puzzle=N` to the URL, where `N` is 1 through 100. This direct-testing aid does not change the shared daily rotation or silently enable sequence mode.
 
 For each puzzle, check:
 
@@ -37,7 +37,7 @@ For each puzzle, check:
 6. Positive and negative feedback with and without a comment.
 7. Refresh behavior after solve/reveal.
 
-Play state is stored per puzzle in the browser. Normal daily results show the time remaining until the next 00:00 UTC launch. Visit `/next` to enter persistent sequence mode, where each completed puzzle can immediately advance through the authored set. Visit `/startover` to clear device-local state and return to today’s puzzle.
+Play state is stored per puzzle in the browser. Normal daily results show the time remaining until the next 00:00 UTC launch. Visit `/next` only for temporary rapid sequence testing, where each completed puzzle can immediately advance through the authored set and bypasses daily scarcity. Visit `/startover` to clear device-local play state and return to the current daily puzzle.
 
 ## Editing content and rules
 
@@ -82,7 +82,7 @@ npm run feedback:report -- --days 30 --puzzle 2
 
 Both views use the same read-only queries and label results as being among feedback submissions. They cannot measure total plays or abandonment.
 
-Review after every five new submissions or every three days. Read every negative rating and written comment, apply one research tag from `FEEDBACK_STRATEGY.md`, choose keep/revise/replace/retest for each reviewed puzzle, and save a dated note using `docs/feedback-reviews/TEMPLATE.md`.
+Review after every five new submissions or every three days. Read every negative rating and written comment, apply one research tag from `FEEDBACK_STRATEGY.md`, choose keep/revise/replace/retest for each reviewed puzzle, and save a dated note using `docs/feedback-reviews/TEMPLATE.md`. These are feedback-submission metrics only; they do not measure total plays, completion, or abandonment.
 
 ## Release process
 

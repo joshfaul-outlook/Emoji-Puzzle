@@ -14,9 +14,11 @@ export default async function NextPuzzle({ searchParams }: NextPuzzleProps) {
       : getNextPuzzle(getDailyPuzzle());
   const next = getNextPuzzle(selected);
 
+  const puzzle = toPublicPuzzle(selected);
   return (
     <DailyPuzzle
-      puzzle={toPublicPuzzle(selected)}
+      key={puzzle.id}
+      puzzle={puzzle}
       sequenceMode
       nextPuzzleNumber={next.number}
     />

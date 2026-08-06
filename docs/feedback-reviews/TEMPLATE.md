@@ -5,6 +5,7 @@
 - Period:
 - Feedback submissions:
 - Puzzles reviewed:
+- Reviewed inventory status: (authored / blind-tested / approved / scheduled)
 
 All metrics below are among feedback submissions; they do not measure total plays or abandonment.
 

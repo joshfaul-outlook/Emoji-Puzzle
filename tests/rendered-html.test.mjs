@@ -12,6 +12,20 @@ import {
   normalizeGuess,
   toPublicPuzzle,
 } from "../lib/puzzles.ts";
+import { restorePlay } from "../lib/play-state.ts";
+import { feedbackPlayFields } from "../lib/feedback-payload.ts";
+
+function memoryStorage(entries = {}) {
+  const values = new Map(Object.entries(entries));
+  return {
+    getItem(key) {
+      return values.get(key) ?? null;
+    },
+    setItem(key, value) {
+      values.set(key, value);
+    },
+  };
+}
 
 test("ships 100 varied, fully authored puzzles for the U.S. public test", () => {
   assert.equal(PUZZLES.length, 100);
@@ -81,6 +95,48 @@ test("advances through the playtest set and wraps after the final puzzle", () =>
   assert.equal(getNextPuzzle(PUZZLES.at(-1)).number, 1);
 });
 
+test("keeps saved play state isolated while advancing through sequence puzzles", () => {
+  const puzzle2Key = `emoji-daily-play:${PUZZLES[1].id}`;
+  const puzzle3Key = `emoji-daily-play:${PUZZLES[2].id}`;
+  const puzzle2State = {
+    playId: "puzzle-2-play",
+    guessCount: 4,
+    hints: ["A phrase"],
+    outcome: "revealed",
+    resolution: { answer: "The elephant in the room", category: "Idiom", explanation: "A hidden obvious problem." },
+    feedbackSent: true,
+  };
+  const storage = memoryStorage({ [puzzle2Key]: JSON.stringify(puzzle2State) });
+
+  assert.deepEqual(restorePlay(storage, puzzle2Key), puzzle2State);
+  assert.equal(restorePlay(storage, puzzle3Key), null, "a puzzle without a save starts fresh");
+  assert.equal(storage.getItem(puzzle3Key), null, "advancing does not copy the prior puzzle save");
+
+  const puzzle3State = {
+    playId: "puzzle-3-play",
+    guessCount: 1,
+    hints: [],
+    outcome: "solved",
+    resolution: { answer: "Vincent van Gogh", category: "Person", explanation: "A painter with a famous ear." },
+    feedbackSent: false,
+  };
+  storage.setItem(puzzle3Key, JSON.stringify(puzzle3State));
+  assert.deepEqual(restorePlay(storage, puzzle3Key), puzzle3State, "the next puzzle restores only its own save");
+  assert.deepEqual(restorePlay(storage, puzzle2Key), puzzle2State, "the previous puzzle remains restorable");
+  assert.deepEqual(
+    feedbackPlayFields(PUZZLES[2], puzzle3State),
+    {
+      puzzleId: PUZZLES[2].id,
+      puzzleNumber: 3,
+      playId: "puzzle-3-play",
+      outcome: "solved",
+      guessCount: 1,
+      hintCount: 0,
+    },
+    "feedback for puzzle 3 uses puzzle 3's play state, never puzzle 2's resolution or outcome",
+  );
+});
+
 test("counts down to the next UTC puzzle launch in hours and minutes", () => {
   const now = new Date("2026-12-31T22:54:30Z");
   const launchAt = getNextPuzzleLaunchAt(now);
@@ -110,6 +166,9 @@ test("keeps answers server-side and includes the complete interaction loop", asy
   assert.match(client, /Next puzzle/);
   assert.match(client, /Next puzzle arrives in/);
   assert.match(client, /sequenceMode && nextPuzzleNumber/);
+  assert.match(client, /hydratedPuzzleId === puzzle\.id/);
+  assert.match(client, /setPlay\(restorePlay\(localStorage, storageKey\) \?\? freshPlay\(\)\)/);
+  assert.match(client, /feedbackPlayFields\(puzzle, play\)/);
   assert.match(client, /window\.location\.replace\("\/"\)/);
   assert.match(client, /How was this puzzle\?/);
   assert.match(client, /PUZZLE #\{puzzle\.dateCode\}/);
@@ -117,9 +176,11 @@ test("keeps answers server-side and includes the complete interaction loop", asy
   assert.match(feedback, /metadataJson/);
   assert.doesNotMatch(`${client}\n${feedback}\n${schema}`, /elapsedSeconds|elapsed_seconds|startedAt|endedAt/);
   assert.match(page, /sequenceMode=\{false\}/);
+  assert.match(page, /key=\{puzzle\.id\}/);
   assert.match(nextRoute, /getNextPuzzle/);
   assert.match(nextRoute, /sequenceMode/);
   assert.match(nextRoute, /nextPuzzleNumber/);
+  assert.match(nextRoute, /key=\{puzzle\.id\}/);
   assert.doesNotMatch(nextRoute, /redirect/);
   assert.match(startOverRoute, /localStorage\.clear\(\)/);
   assert.match(startOverRoute, /sessionStorage\.clear\(\)/);

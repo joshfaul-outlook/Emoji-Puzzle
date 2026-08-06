@@ -20,7 +20,7 @@ This combines explicit sentiment with enough play context to interpret it. It in
 
 ## Review cadence
 
-During the first ten-puzzle playtest, review feedback after every five completed players or every three days, whichever comes first.
+During the ongoing 100-puzzle public test, review feedback after every five new feedback submissions or every three days, whichever comes first. This cadence applies to staged review batches, not to a claim that all authored puzzles are already validated.
 
 For each puzzle, summarize:
 
@@ -33,6 +33,8 @@ For each puzzle, summarize:
 - one recommended action: keep, revise, replace, or retest.
 
 Keep small samples visible. A single clear comment can reveal a real ambiguity even when the aggregate rating looks positive.
+
+All report metrics describe feedback submissions, not total plays, completion, or abandonment. Treat solved/revealed, hint, and guess figures as context for people who submitted feedback, not population-wide rates.
 
 ## Comment tags
 

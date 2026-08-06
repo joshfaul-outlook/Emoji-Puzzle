@@ -11,7 +11,7 @@ The product is built around one question: can we repeatedly create puzzles that 
 ## What the base MVP includes
 
 - One globally shared daily puzzle
-- Ten varied, editable playtest puzzles
+- 100 varied, editable public-test puzzles
 - No in-game account requirement
 - Free-form guesses with deterministic accepted variants
 - Progressive authored hints, one at a time
@@ -34,7 +34,7 @@ npm install
 npm run dev
 ```
 
-Open the local address printed by the development server. Use `?puzzle=1` through `?puzzle=10` to test a specific seeded puzzle.
+Open the local address printed by the development server. Use `?puzzle=1` through `?puzzle=100` to test a specific authored puzzle; this does not enable sequence mode. Use `/next` only for temporary rapid sequence testing, which bypasses the normal daily wait. Use `/startover` to clear device-local play state and return to the current daily puzzle.
 
 ## Verify
 
@@ -60,4 +60,4 @@ The feedback schema lives in `db/schema.ts`, with a generated migration in `driz
 
 ## Status
 
-This repository is the branded starting point for mechanics and puzzle-quality iteration. The first ten puzzles are experimental probes, not a permanent content library.
+This repository is the branded starting point for mechanics and puzzle-quality iteration. The 100-puzzle pool is experimental authored inventory, not a claim that every puzzle has been blind-tested or approved for the daily rotation. Review, revise, approve, and schedule puzzles in small batches.

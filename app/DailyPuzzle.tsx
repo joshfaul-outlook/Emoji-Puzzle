@@ -7,23 +7,8 @@ import {
   getNextPuzzleLaunchAt,
   type PublicPuzzle,
 } from "../lib/puzzles";
-
-type Resolution = {
-  answer: string;
-  category: string;
-  explanation: string;
-};
-
-type Outcome = "playing" | "solved" | "revealed";
-
-type PlayState = {
-  playId: string;
-  guessCount: number;
-  hints: string[];
-  outcome: Outcome;
-  resolution: Resolution | null;
-  feedbackSent: boolean;
-};
+import { restorePlay, type PlayState, type Resolution } from "../lib/play-state";
+import { feedbackPlayFields } from "../lib/feedback-payload";
 
 const SESSION_KEY = "emoji-daily-anonymous-session";
 
@@ -57,7 +42,7 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirmReveal, setConfirmReveal] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
+  const [hydratedPuzzleId, setHydratedPuzzleId] = useState<string | null>(null);
   const [nextPuzzleCountdown, setNextPuzzleCountdown] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "shared" | "copied" | "error">("idle");
@@ -70,36 +55,41 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
   const isFinished = play.outcome !== "playing" && play.resolution !== null;
 
   useEffect(() => {
-    const saved = localStorage.getItem(storageKey);
-    let restored: PlayState | null = null;
-    try {
-      restored = saved ? (JSON.parse(saved) as PlayState) : null;
-    } catch {
-      restored = null;
-    }
+    // Do not allow state from a previously rendered puzzle to be persisted
+    // under this puzzle's key while client navigation is settling.
     const task = window.setTimeout(() => {
-      if (restored) {
-        setPlay(restored);
-      }
-      setHydrated(true);
+      setPlay(restorePlay(localStorage, storageKey) ?? freshPlay());
+      setGuess("");
+      setMessage("");
+      setBusy(false);
+      setConfirmReveal(false);
+      setNextPuzzleCountdown("");
+      setShareOpen(false);
+      setShareState("idle");
       setNativeSharingAvailable(typeof navigator.share === "function");
+      setRating(null);
+      setComment("");
+      setFeedbackState("idle");
+      setHydratedPuzzleId(puzzle.id);
     }, 0);
     return () => window.clearTimeout(task);
-  }, [storageKey]);
+  }, [puzzle.id, storageKey]);
 
   useEffect(() => {
-    if (hydrated) localStorage.setItem(storageKey, JSON.stringify(play));
-  }, [hydrated, play, storageKey]);
+    if (hydratedPuzzleId === puzzle.id) {
+      localStorage.setItem(storageKey, JSON.stringify(play));
+    }
+  }, [hydratedPuzzleId, play, puzzle.id, storageKey]);
 
   useEffect(() => {
     if (
-      hydrated &&
+      hydratedPuzzleId === puzzle.id &&
       play.outcome === "playing" &&
       window.matchMedia("(pointer: fine)").matches
     ) {
       inputRef.current?.focus();
     }
-  }, [hydrated, play.outcome]);
+  }, [hydratedPuzzleId, play.outcome, puzzle.id]);
 
   useEffect(() => {
     if (!shareOpen) return;
@@ -308,15 +298,10 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          puzzleId: puzzle.id,
-          puzzleNumber: puzzle.number,
           rating,
           comment,
-          playId: play.playId,
+          ...feedbackPlayFields(puzzle, play),
           anonymousSessionId: getAnonymousSessionId(),
-          outcome: play.outcome,
-          guessCount: play.guessCount,
-          hintCount: play.hints.length,
           metadata: {
             playedDateUtc: new Date().toISOString().slice(0, 10),
             locale: navigator.language,

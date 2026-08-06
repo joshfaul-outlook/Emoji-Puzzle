@@ -21,7 +21,7 @@ This baseline is intentionally small. The next work is product learning, not fea
 
 ## Phase 1: Validate the mechanics
 
-Run the ten-puzzle set with a small group and watch for:
+Run small, representative batches from the 100-puzzle public-test inventory with a small group and watch for:
 
 - whether the task is understood without explanation;
 - how people phrase correct answers;
@@ -55,7 +55,7 @@ Use feedback from the first set to create a repeatable authoring workflow:
 8. Record difficulty, ambiguity, delight, and missed variants.
 9. Publish only after the reveal consistently feels fair.
 
-Review and release the expanded inventory in small groups so early feedback can improve later puzzles before their scheduled day.
+Review, approve, and schedule the authored inventory in small groups so early feedback can improve later puzzles before their scheduled day. Authoring a schema-complete puzzle does not make it reviewed or scheduled.
 
 ## Phase 3: Improve the learning loop
 
@@ -105,12 +105,12 @@ Before promoting beyond a controlled playtest:
 
 ## Near-term backlog
 
-1. Run an internal sample across every content category using the temporary `/next` route; use `/startover` to simulate a new player.
-2. Review raw feedback after every five players or every three days, whichever comes first.
-3. Fix accepted variants and wording without changing multiple mechanics at once.
-4. Replace or revise the weakest puzzles before they reach the daily rotation.
+1. Audit the 100-puzzle pool in small, representative batches using the temporary `/next` route; use `/startover` to simulate a new player.
+2. Review feedback submissions after every five new submissions or every three days, whichever comes first.
+3. Revise accepted variants and wording without changing multiple mechanics at once.
+4. Approve and schedule only reviewed puzzles for the daily rotation; replace or revise weak puzzles before their scheduled day.
 5. Audit upcoming five-puzzle batches for ambiguity, reference familiarity, and missed fair answer variants.
 6. Decide whether a tiny first-visit instruction or example is actually needed.
 7. Add a privacy note and error monitoring before broad promotion.
 
-The `/next` route deliberately enables persistent sequence mode and bypasses daily scarcity for mechanics testing. Root and `?puzzle=N` results retain the daily wait. Remove `/next` before the daily ritual becomes the primary evaluation target.
+The `/next` route deliberately enables temporary rapid sequence testing and bypasses daily scarcity. Root and `?puzzle=N` retain normal daily behavior; `?puzzle=N` selects a direct-testing puzzle without enabling sequence mode. Remove `/next` before the daily ritual becomes the primary evaluation target.
