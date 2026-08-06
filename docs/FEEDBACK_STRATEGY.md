@@ -72,4 +72,4 @@ Avoid changing hint policy, result copy, sharing, and answer acceptance simultan
 
 Add event-level analytics when a concrete question cannot be answered from result feedback—for example, where players abandon before reaching a result. If added, document the event, purpose, retention, and privacy impact before collection begins.
 
-An internal feedback export or analysis notebook can follow once raw volume makes manual review inconvenient. A public dashboard and admin UI remain out of scope.
+The internal read-only feedback report supports the existing manual review cadence without adding event tracking, write controls, or a public dashboard. An export or analysis notebook can follow once raw volume makes manual review inconvenient. A CRUD admin UI remains out of scope.
