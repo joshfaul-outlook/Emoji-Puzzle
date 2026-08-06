@@ -347,7 +347,7 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
             <span aria-hidden="true">↗</span>
             <span>Share</span>
           </button>
-          <div className="day-pill">Puzzle #{puzzle.number}</div>
+          <div className="day-pill">PUZZLE #{puzzle.dateCode}</div>
         </div>
       </header>
 
