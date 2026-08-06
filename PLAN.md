@@ -5,7 +5,7 @@
 The repository begins with a usable mechanics prototype:
 
 - a branded, mobile-first daily puzzle screen;
-- ten editable playtest puzzles;
+- 100 editable public-test puzzles aimed at a broad U.S. audience;
 - a UTC-based shared daily rotation;
 - server-side answer checking with explicit variants;
 - unlimited guesses and three progressive hints;
@@ -55,7 +55,7 @@ Use feedback from the first set to create a repeatable authoring workflow:
 8. Record difficulty, ambiguity, delight, and missed variants.
 9. Publish only after the reveal consistently feels fair.
 
-Build the next batch in small groups of five rather than creating a year of content upfront.
+Review and release the expanded inventory in small groups so early feedback can improve later puzzles before their scheduled day.
 
 ## Phase 3: Improve the learning loop
 
@@ -105,11 +105,11 @@ Before promoting beyond a controlled playtest:
 
 ## Near-term backlog
 
-1. Run an internal ten-puzzle playtest using the temporary `/next` route; use `/startover` to simulate a new player.
+1. Run an internal sample across every content category using the temporary `/next` route; use `/startover` to simulate a new player.
 2. Review raw feedback after every five players or every three days, whichever comes first.
 3. Fix accepted variants and wording without changing multiple mechanics at once.
-4. Replace the two weakest puzzles before expanding the set.
-5. Author puzzles 11–15 using the strongest two structures plus one deliberate experiment.
+4. Replace or revise the weakest puzzles before they reach the daily rotation.
+5. Audit upcoming five-puzzle batches for ambiguity, reference familiarity, and missed fair answer variants.
 6. Decide whether a tiny first-visit instruction or example is actually needed.
 7. Add a privacy note and error monitoring before broad promotion.
 

@@ -11,15 +11,24 @@ import {
   normalizeGuess,
 } from "../lib/puzzles.ts";
 
-test("ships ten varied, fully authored playtest puzzles", () => {
-  assert.equal(PUZZLES.length, 10);
+test("ships 100 varied, fully authored puzzles for the U.S. public test", () => {
+  assert.equal(PUZZLES.length, 100);
+  assert.deepEqual(
+    PUZZLES.map((puzzle) => puzzle.number),
+    Array.from({ length: 100 }, (_, index) => index + 1),
+  );
+  assert.equal(new Set(PUZZLES.map((puzzle) => puzzle.id)).size, 100);
   const structures = new Set(PUZZLES.map((puzzle) => puzzle.structure));
   for (const expected of ["literal", "idiom", "rebus", "person", "story", "movie", "historical", "interpretive"]) {
     assert.equal(structures.has(expected), true, `missing ${expected} puzzle`);
   }
   for (const puzzle of PUZZLES) {
     assert.equal(puzzle.hints.length, 3);
-    assert.ok(puzzle.acceptedAnswers.length > 0);
+    assert.ok(puzzle.acceptedAnswers.length >= 2);
+    assert.equal(isAcceptedGuess(puzzle, puzzle.answer), true, `canonical answer rejected for #${puzzle.number}`);
+    assert.ok(puzzle.id.length > 0);
+    assert.ok(puzzle.emoji.length > 0);
+    assert.ok(puzzle.category.length > 0);
     assert.ok(puzzle.explanation.length > 30);
   }
 });
