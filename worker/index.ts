@@ -40,7 +40,19 @@ const worker = {
       }, allowedWidths);
     }
 
-    return handler.fetch(request, env, ctx);
+    const response = await handler.fetch(request, env, ctx);
+    if (url.pathname === "/internal/feedback-report") {
+      const responseHeaders = new Headers(response.headers);
+      responseHeaders.set("Cache-Control", "private, no-store");
+      responseHeaders.set("X-Robots-Tag", "noindex, nofollow");
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders,
+      });
+    }
+
+    return response;
   },
 };
 
