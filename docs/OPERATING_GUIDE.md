@@ -70,7 +70,7 @@ Do not add direct identifiers or reuse the anonymous session id outside this pro
 
 ## Reviewing feedback
 
-The deployed `/internal/feedback-report` page is a read-only operational view for approved reviewers. It requires ChatGPT sign-in and membership in the server-side `FEEDBACK_REVIEWER_EMAILS` allowlist. The page shows aggregate and per-puzzle signals plus the latest negative or written feedback; it never displays play ids, anonymous session ids, or device metadata.
+The deployed `/internal/feedback-report` page is a read-only operational view for the owner. It requires ChatGPT sign-in and an exact server-side match to the owner email in `lib/feedback-review-auth.ts`; other ChatGPT accounts receive a not-found response. The page shows aggregate and per-puzzle signals plus the latest negative or written feedback; it never displays play ids, anonymous session ids, or device metadata.
 
 For local development data, stop the development server and run:
 
