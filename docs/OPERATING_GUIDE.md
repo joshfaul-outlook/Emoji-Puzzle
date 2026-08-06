@@ -68,6 +68,22 @@ Each row contains:
 
 Do not add direct identifiers or reuse the anonymous session id outside this product.
 
+## Reviewing feedback
+
+The deployed `/internal/feedback-report` page is a read-only operational view for the owner. It requires ChatGPT sign-in and an exact server-side match to the owner email in `lib/feedback-review-auth.ts`; other ChatGPT accounts receive a not-found response. The page shows aggregate and per-puzzle signals plus the latest negative or written feedback; it never displays play ids, anonymous session ids, or device metadata.
+
+For local development data, stop the development server and run:
+
+```bash
+npm run feedback:report
+npm run feedback:report -- --days 7
+npm run feedback:report -- --days 30 --puzzle 2
+```
+
+Both views use the same read-only queries and label results as being among feedback submissions. They cannot measure total plays or abandonment.
+
+Review after every five new submissions or every three days. Read every negative rating and written comment, apply one research tag from `FEEDBACK_STRATEGY.md`, choose keep/revise/replace/retest for each reviewed puzzle, and save a dated note using `docs/feedback-reviews/TEMPLATE.md`.
+
 ## Release process
 
 1. Confirm the working tree contains only intended changes.
