@@ -1866,7 +1866,22 @@ const ADDITIONAL_PRACTICE_SEEDS: PracticeSeed[] = [
 
 export const ADDITIONAL_PRACTICE_PUZZLES = ADDITIONAL_PRACTICE_SEEDS.map(easyPracticePuzzle);
 export const DAILY_PUZZLES = PUZZLES.slice(0, 20);
-export const PRACTICE_PUZZLES = [...PUZZLES.slice(20), ...ADDITIONAL_PRACTICE_PUZZLES];
+
+function shuffledPracticePuzzles(puzzles: Puzzle[]) {
+  const shuffled = [...puzzles];
+  let state = 0x5eeda11;
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+    const swapIndex = state % (index + 1);
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
+export const PRACTICE_PUZZLES = shuffledPracticePuzzles([
+  ...PUZZLES.slice(20),
+  ...ADDITIONAL_PRACTICE_PUZZLES,
+]);
 export const ALL_PUZZLES = [...PUZZLES, ...ADDITIONAL_PRACTICE_PUZZLES];
 
 export function normalizeGuess(value: string) {

@@ -67,10 +67,15 @@ test("separates the active daily rotation from the spoiler-safe practice sequenc
   assert.equal(ADDITIONAL_PRACTICE_PUZZLES.length, 250);
   assert.equal(PRACTICE_PUZZLES.length, 330);
   assert.equal(ALL_PUZZLES.length, 350);
-  assert.deepEqual(PRACTICE_PUZZLES.slice(0, 80).map((puzzle) => puzzle.number), Array.from({ length: 80 }, (_, index) => index + 21));
   assert.deepEqual(ADDITIONAL_PRACTICE_PUZZLES.map((puzzle) => puzzle.number), Array.from({ length: 250 }, (_, index) => index + 101));
-  assert.equal(getPracticePuzzleByPosition(1).number, 21);
-  assert.equal(getPracticePuzzleByPosition(330).number, 350);
+  assert.deepEqual(
+    PRACTICE_PUZZLES.map((puzzle) => puzzle.number).toSorted((left, right) => left - right),
+    Array.from({ length: 330 }, (_, index) => index + 21),
+  );
+  const firstFifty = PRACTICE_PUZZLES.slice(0, 50);
+  assert.ok(firstFifty.some((puzzle) => puzzle.number <= 100), "the original records are mixed near the front");
+  assert.ok(firstFifty.some((puzzle) => puzzle.number >= 101), "the new records are mixed near the front");
+  assert.notEqual(getPracticePuzzleByPosition(1).number, 21, "Practice is no longer in authored-number order");
   assert.equal(new Set(ALL_PUZZLES.map((puzzle) => puzzle.id)).size, 350);
   assert.equal(getPuzzleById(DAILY_PUZZLES[0].id, "practice"), undefined);
   assert.equal(getPuzzleById(PRACTICE_PUZZLES[0].id, "daily"), undefined);
@@ -133,8 +138,7 @@ test("derives the daily edition code from the actual UTC date", () => {
 test("cycles Daily after 20 and Practice after its independent final puzzle", () => {
   assert.equal(getNextPuzzle(DAILY_PUZZLES[0], "daily").number, 2);
   assert.equal(getNextPuzzle(DAILY_PUZZLES.at(-1), "daily").number, 1);
-  assert.equal(getNextPuzzle(PRACTICE_PUZZLES[0], "practice").number, 22);
-  assert.equal(getNextPuzzle(PRACTICE_PUZZLES.at(-1), "practice").number, 21);
+  assert.equal(getNextPuzzle(PRACTICE_PUZZLES.at(-1), "practice").id, PRACTICE_PUZZLES[0].id);
   assert.equal(getDailyPuzzle(new Date("2026-08-25T00:00:00Z")).number, 1);
 });
 
