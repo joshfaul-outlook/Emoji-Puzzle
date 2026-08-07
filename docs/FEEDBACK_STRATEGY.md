@@ -14,7 +14,7 @@ The initial questions are:
 
 ## What is captured now
 
-After solve or reveal, a player can select thumbs up or down and optionally explain why. The record includes the puzzle, outcome, guess count, hints used, timestamp, and limited anonymous device context.
+After a Daily solve or reveal, a player can select thumbs up or down and optionally explain why. Practice and standalone challenges collect thumbs only, with comments rejected server-side. Every record includes its puzzle pool, outcome, guess count, hints used, timestamp, and limited anonymous device context so Daily and Practice signals can be reviewed separately.
 
 This combines explicit sentiment with enough play context to interpret it. It intentionally does not produce a universal score.
 

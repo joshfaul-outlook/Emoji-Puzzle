@@ -2,17 +2,28 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
+  DAILY_PUZZLES,
+  PRACTICE_PUZZLES,
   PUZZLES,
   formatTimeUntilPuzzleLaunch,
   getDailyPuzzle,
   getNextPuzzle,
   getNextPuzzleLaunchAt,
+  getPracticePuzzleByPosition,
+  getPuzzleById,
   getPuzzleDateCode,
+  isRankingEligible,
   isAcceptedGuess,
   normalizeGuess,
   toPublicPuzzle,
 } from "../lib/puzzles.ts";
-import { restorePlay } from "../lib/play-state.ts";
+import {
+  dailyPlayStorageKey,
+  getActiveMode,
+  practicePlayStorageKey,
+  restorePlay,
+  restorePracticeProgress,
+} from "../lib/play-state.ts";
 import { feedbackPlayFields } from "../lib/feedback-payload.ts";
 
 function memoryStorage(entries = {}) {
@@ -47,6 +58,16 @@ test("ships 100 varied, fully authored puzzles for the U.S. public test", () => 
     assert.ok(puzzle.category.length > 0);
     assert.ok(puzzle.explanation.length > 30);
   }
+});
+
+test("separates the active daily rotation from the spoiler-safe practice sequence", () => {
+  assert.deepEqual(DAILY_PUZZLES.map((puzzle) => puzzle.number), Array.from({ length: 20 }, (_, index) => index + 1));
+  assert.deepEqual(PRACTICE_PUZZLES.map((puzzle) => puzzle.number), Array.from({ length: 80 }, (_, index) => index + 21));
+  assert.equal(getPracticePuzzleByPosition(1).number, 21);
+  assert.equal(getPracticePuzzleByPosition(80).number, 100);
+  assert.equal(new Set([...DAILY_PUZZLES, ...PRACTICE_PUZZLES].map((puzzle) => puzzle.id)).size, 100);
+  assert.equal(getPuzzleById(DAILY_PUZZLES[0].id, "practice"), undefined);
+  assert.equal(getPuzzleById(PRACTICE_PUZZLES[0].id, "daily"), undefined);
 });
 
 test("normalizes diacritics, punctuation, casing, apostrophes, ampersands, and whitespace deterministically", () => {
@@ -84,20 +105,33 @@ test("uses one shared UTC puzzle for the whole calendar day", () => {
   assert.equal(morning.number, 2);
 });
 
-test("derives the public YYMMDD code from each puzzle's scheduled UTC date", () => {
-  assert.equal(getPuzzleDateCode(PUZZLES[0]), "260805");
-  assert.equal(getPuzzleDateCode(PUZZLES[1]), "260806");
-  assert.equal(toPublicPuzzle(PUZZLES[0]).dateCode, "260805");
+test("derives the daily edition code from the actual UTC date", () => {
+  const now = new Date("2026-08-25T18:00:00Z");
+  const publicPuzzle = toPublicPuzzle(getDailyPuzzle(now), { pool: "daily", context: "daily", now });
+  assert.equal(getPuzzleDateCode(now), "260825");
+  assert.equal(publicPuzzle.dateCode, "260825");
+  assert.equal(publicPuzzle.rankingEligible, true);
+  assert.equal(publicPuzzle.legacyStorageEligible, false, "a repeated puzzle must not restore its first-cycle save");
 });
 
-test("advances through the playtest set and wraps after the final puzzle", () => {
-  assert.equal(getNextPuzzle(PUZZLES[0]).number, 2);
-  assert.equal(getNextPuzzle(PUZZLES.at(-1)).number, 1);
+test("cycles Daily after 20 and Practice after its independent final puzzle", () => {
+  assert.equal(getNextPuzzle(DAILY_PUZZLES[0], "daily").number, 2);
+  assert.equal(getNextPuzzle(DAILY_PUZZLES.at(-1), "daily").number, 1);
+  assert.equal(getNextPuzzle(PRACTICE_PUZZLES[0], "practice").number, 22);
+  assert.equal(getNextPuzzle(PRACTICE_PUZZLES.at(-1), "practice").number, 21);
+  assert.equal(getDailyPuzzle(new Date("2026-08-25T00:00:00Z")).number, 1);
+});
+
+test("only the genuine daily context is ranking eligible", () => {
+  assert.equal(isRankingEligible("daily"), true);
+  for (const context of ["practice", "challenge", "author-test"]) {
+    assert.equal(isRankingEligible(context), false);
+  }
 });
 
 test("keeps saved play state isolated while advancing through sequence puzzles", () => {
-  const puzzle2Key = `emoji-daily-play:${PUZZLES[1].id}`;
-  const puzzle3Key = `emoji-daily-play:${PUZZLES[2].id}`;
+  const puzzle2Key = dailyPlayStorageKey(PUZZLES[1].id, "260806");
+  const puzzle3Key = dailyPlayStorageKey(PUZZLES[2].id, "260807");
   const puzzle2State = {
     playId: "puzzle-2-play",
     guessCount: 4,
@@ -137,6 +171,21 @@ test("keeps saved play state isolated while advancing through sequence puzzles",
   );
 });
 
+test("restores valid practice progress and isolates replay cycles", () => {
+  const storage = memoryStorage({
+    "emoji-daily-practice-progress": JSON.stringify({ position: 17, cycle: 2 }),
+  });
+  assert.deepEqual(restorePracticeProgress(storage, 80), { position: 17, cycle: 2 });
+  assert.notEqual(practicePlayStorageKey("practice-puzzle", 2), practicePlayStorageKey("practice-puzzle", 3));
+  assert.deepEqual(restorePracticeProgress(memoryStorage({ "emoji-daily-practice-progress": "broken" }), 80), { position: 1, cycle: 0 });
+});
+
+test("defaults a new tab session to Daily and retains an explicit Practice selection", () => {
+  assert.equal(getActiveMode(memoryStorage()), "daily");
+  assert.equal(getActiveMode(memoryStorage({ "emoji-daily-active-mode": "daily" })), "daily");
+  assert.equal(getActiveMode(memoryStorage({ "emoji-daily-active-mode": "practice" })), "practice");
+});
+
 test("counts down to the next UTC puzzle launch in hours and minutes", () => {
   const now = new Date("2026-12-31T22:54:30Z");
   const launchAt = getNextPuzzleLaunchAt(now);
@@ -148,8 +197,9 @@ test("counts down to the next UTC puzzle launch in hours and minutes", () => {
 });
 
 test("keeps answers server-side and includes the complete interaction loop", async () => {
-  const [page, client, feedback, nextRoute, startOverRoute, schema] = await Promise.all([
+  const [page, practicePage, client, feedback, nextRoute, startOverRoute, schema] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/practice/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/DailyPuzzle.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/feedback/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/next/page.tsx", import.meta.url), "utf8"),
@@ -165,22 +215,27 @@ test("keeps answers server-side and includes the complete interaction loop", asy
   assert.match(client, /Email/);
   assert.match(client, /Next puzzle/);
   assert.match(client, /Next puzzle arrives in/);
-  assert.match(client, /sequenceMode && nextPuzzleNumber/);
   assert.match(client, /hydratedPuzzleId === puzzle\.id/);
-  assert.match(client, /setPlay\(restorePlay\(localStorage, storageKey\) \?\? freshPlay\(\)\)/);
+  assert.match(client, /PRACTICE_PROGRESS_KEY/);
+  assert.match(client, /ACTIVE_MODE_KEY/);
+  assert.match(client, /sessionStorage\.setItem/);
+  assert.match(client, /challengePlayStorageKey/);
   assert.match(client, /feedbackPlayFields\(puzzle, play\)/);
   assert.match(client, /window\.location\.replace\("\/"\)/);
   assert.match(client, /How was this puzzle\?/);
-  assert.match(client, /PUZZLE #\{puzzle\.dateCode\}/);
+  assert.match(client, /puzzle\.dateCode/);
+  assert.match(client, /Daily/);
+  assert.match(client, /Practice/);
+  assert.match(client, /Can you beat my result/);
   assert.match(feedback, /anonymousSessionId/);
   assert.match(feedback, /metadataJson/);
+  assert.match(feedback, /pool === "practice" && comment !== null/);
   assert.doesNotMatch(`${client}\n${feedback}\n${schema}`, /elapsedSeconds|elapsed_seconds|startedAt|endedAt/);
-  assert.match(page, /sequenceMode=\{false\}/);
-  assert.match(page, /key=\{puzzle\.id\}/);
+  assert.match(page, /context: isAuthorTest \? "author-test" : "daily"/);
+  assert.match(practicePage, /context: isChallenge \? "challenge" : "practice"/);
+  assert.match(practicePage, /resumePractice/);
   assert.match(nextRoute, /getNextPuzzle/);
-  assert.match(nextRoute, /sequenceMode/);
   assert.match(nextRoute, /nextPuzzleNumber/);
-  assert.match(nextRoute, /key=\{puzzle\.id\}/);
   assert.doesNotMatch(nextRoute, /redirect/);
   assert.match(startOverRoute, /localStorage\.clear\(\)/);
   assert.match(startOverRoute, /sessionStorage\.clear\(\)/);

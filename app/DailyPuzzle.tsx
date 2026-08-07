@@ -7,7 +7,19 @@ import {
   getNextPuzzleLaunchAt,
   type PublicPuzzle,
 } from "../lib/puzzles";
-import { restorePlay, type PlayState, type Resolution } from "../lib/play-state";
+import {
+  ACTIVE_MODE_KEY,
+  PRACTICE_PROGRESS_KEY,
+  challengePlayStorageKey,
+  dailyPlayStorageKey,
+  getActiveMode,
+  practicePlayStorageKey,
+  restorePlay,
+  restorePracticeProgress,
+  type PlayState,
+  type PracticeProgress,
+  type Resolution,
+} from "../lib/play-state";
 import { feedbackPlayFields } from "../lib/feedback-payload";
 
 const SESSION_KEY = "emoji-daily-anonymous-session";
@@ -31,12 +43,23 @@ function freshPlay(): PlayState {
 
 type DailyPuzzleProps = {
   puzzle: PublicPuzzle;
-  sequenceMode: boolean;
   nextPuzzleNumber?: number;
+  challengeBenchmark?: ChallengeBenchmark | null;
+  resumePractice?: boolean;
 };
 
-export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuzzleProps) {
-  const storageKey = `emoji-daily-play:${puzzle.id}`;
+export type ChallengeBenchmark = {
+  outcome: "solved" | "revealed";
+  guessCount: number;
+  hintCount: number;
+};
+
+export function DailyPuzzle({
+  puzzle,
+  nextPuzzleNumber,
+  challengeBenchmark = null,
+  resumePractice = false,
+}: DailyPuzzleProps) {
   const [play, setPlay] = useState<PlayState>(() => freshPlay());
   const [guess, setGuess] = useState("");
   const [message, setMessage] = useState("");
@@ -50,15 +73,51 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
   const [rating, setRating] = useState<"up" | "down" | null>(null);
   const [comment, setComment] = useState("");
   const [feedbackState, setFeedbackState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [playStorageKey, setPlayStorageKey] = useState<string | null>(null);
+  const [practiceProgress, setPracticeProgress] = useState<PracticeProgress>({ position: 1, cycle: 0 });
   const inputRef = useRef<HTMLInputElement>(null);
   const sharePanelRef = useRef<HTMLDivElement>(null);
   const isFinished = play.outcome !== "playing" && play.resolution !== null;
 
   useEffect(() => {
-    // Do not allow state from a previously rendered puzzle to be persisted
-    // under this puzzle's key while client navigation is settling.
     const task = window.setTimeout(() => {
-      setPlay(restorePlay(localStorage, storageKey) ?? freshPlay());
+      if (puzzle.context === "daily") {
+        const dateCode = puzzle.dateCode ?? new Date().toISOString().slice(2, 10).replace(/-/g, "");
+        const nextStorageKey = dailyPlayStorageKey(puzzle.id, dateCode);
+        const legacyStorageKey = `emoji-daily-play:${puzzle.id}`;
+        const restored = restorePlay(localStorage, nextStorageKey) ?? (
+          puzzle.legacyStorageEligible ? restorePlay(localStorage, legacyStorageKey) : null
+        );
+        setPlay(restored ?? freshPlay());
+        setPlayStorageKey(nextStorageKey);
+      } else if (puzzle.context === "practice") {
+        sessionStorage.setItem(ACTIVE_MODE_KEY, "practice");
+        const progress = restorePracticeProgress(localStorage, puzzle.sequenceLength);
+        if (resumePractice && progress.position !== puzzle.sequenceNumber) {
+          window.location.replace(`/practice?puzzle=${progress.position}`);
+          return;
+        }
+        const currentProgress = progress.position === puzzle.sequenceNumber
+          ? progress
+          : { position: puzzle.sequenceNumber, cycle: progress.cycle };
+        localStorage.setItem(PRACTICE_PROGRESS_KEY, JSON.stringify(currentProgress));
+        setPracticeProgress(currentProgress);
+        const nextStorageKey = practicePlayStorageKey(puzzle.id, currentProgress.cycle);
+        setPlay(restorePlay(localStorage, nextStorageKey) ?? freshPlay());
+        setPlayStorageKey(nextStorageKey);
+      } else if (puzzle.context === "challenge") {
+        sessionStorage.setItem(ACTIVE_MODE_KEY, "practice");
+        const challengeKey = challengeBenchmark
+          ? `${challengeBenchmark.outcome}-${challengeBenchmark.guessCount}-${challengeBenchmark.hintCount}`
+          : "open";
+        const nextStorageKey = challengePlayStorageKey(puzzle.id, challengeKey);
+        setPlay(restorePlay(localStorage, nextStorageKey) ?? freshPlay());
+        setPlayStorageKey(nextStorageKey);
+      } else {
+        const nextStorageKey = `emoji-daily-play:author-test:${puzzle.id}`;
+        setPlay(restorePlay(localStorage, nextStorageKey) ?? freshPlay());
+        setPlayStorageKey(nextStorageKey);
+      }
       setGuess("");
       setMessage("");
       setBusy(false);
@@ -73,13 +132,20 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
       setHydratedPuzzleId(puzzle.id);
     }, 0);
     return () => window.clearTimeout(task);
-  }, [puzzle.id, storageKey]);
+  }, [challengeBenchmark, puzzle, resumePractice]);
 
   useEffect(() => {
-    if (hydratedPuzzleId === puzzle.id) {
-      localStorage.setItem(storageKey, JSON.stringify(play));
+    if (hydratedPuzzleId === puzzle.id && playStorageKey) {
+      localStorage.setItem(playStorageKey, JSON.stringify(play));
     }
-  }, [hydratedPuzzleId, play, puzzle.id, storageKey]);
+  }, [hydratedPuzzleId, play, playStorageKey, puzzle.id]);
+
+  useEffect(() => {
+    if (puzzle.context !== "daily") return;
+    if (getActiveMode(sessionStorage) !== "practice") return;
+    const progress = restorePracticeProgress(localStorage, Number.MAX_SAFE_INTEGER);
+    window.location.replace(`/practice?puzzle=${progress.position}`);
+  }, [puzzle.context]);
 
   useEffect(() => {
     if (
@@ -109,7 +175,7 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
   }, [shareOpen]);
 
   useEffect(() => {
-    if (!isFinished || sequenceMode) return;
+    if (!isFinished || puzzle.context !== "daily") return;
     const nextLaunchAt = getNextPuzzleLaunchAt();
 
     const updateCountdown = () => {
@@ -124,7 +190,7 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
     updateCountdown();
     const interval = window.setInterval(updateCountdown, 1_000);
     return () => window.clearInterval(interval);
-  }, [isFinished, sequenceMode]);
+  }, [isFinished, puzzle.context]);
 
   async function submitGuess(event: FormEvent) {
     event.preventDefault();
@@ -138,7 +204,7 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
       const response = await fetch("/api/guess", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ puzzleId: puzzle.id, guess: trimmed }),
+        body: JSON.stringify({ puzzleId: puzzle.id, pool: puzzle.pool, guess: trimmed }),
       });
       const data = (await response.json()) as {
         correct?: boolean;
@@ -174,7 +240,7 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
       const response = await fetch("/api/hint", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ puzzleId: puzzle.id, hintIndex: play.hints.length }),
+        body: JSON.stringify({ puzzleId: puzzle.id, pool: puzzle.pool, hintIndex: play.hints.length }),
       });
       const data = (await response.json()) as { hint?: string };
       if (data.hint) {
@@ -194,7 +260,7 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
       const response = await fetch("/api/reveal", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ puzzleId: puzzle.id }),
+        body: JSON.stringify({ puzzleId: puzzle.id, pool: puzzle.pool }),
       });
       const data = (await response.json()) as { resolution?: Resolution };
       if (data.resolution) {
@@ -212,17 +278,61 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
     }
   }
 
-  function dailyUrl() {
-    return new URL("/", window.location.origin).toString();
+  function switchMode(mode: "daily" | "practice") {
+    sessionStorage.setItem(ACTIVE_MODE_KEY, mode);
+    if (mode === "daily") {
+      window.location.assign("/");
+      return;
+    }
+    const progress = restorePracticeProgress(localStorage, Number.MAX_SAFE_INTEGER);
+    window.location.assign(`/practice?puzzle=${progress.position}`);
+  }
+
+  function advancePractice() {
+    const wraps = puzzle.sequenceNumber >= puzzle.sequenceLength;
+    const nextProgress = {
+      position: wraps ? 1 : puzzle.sequenceNumber + 1,
+      cycle: wraps ? practiceProgress.cycle + 1 : practiceProgress.cycle,
+    };
+    localStorage.setItem(PRACTICE_PROGRESS_KEY, JSON.stringify(nextProgress));
+    sessionStorage.setItem(ACTIVE_MODE_KEY, "practice");
+    window.location.assign(`/practice?puzzle=${nextProgress.position}`);
+  }
+
+  function returnToPractice() {
+    const progress = restorePracticeProgress(localStorage, Number.MAX_SAFE_INTEGER);
+    sessionStorage.setItem(ACTIVE_MODE_KEY, "practice");
+    window.location.assign(`/practice?puzzle=${progress.position}`);
+  }
+
+  function shareUrl() {
+    if (puzzle.pool === "daily") return new URL("/", window.location.origin).toString();
+    const url = new URL("/practice", window.location.origin);
+    url.searchParams.set("challenge", String(puzzle.sequenceNumber));
+    if (play.outcome !== "playing") {
+      url.searchParams.set("outcome", play.outcome);
+      url.searchParams.set("guesses", String(play.guessCount));
+      url.searchParams.set("hints", String(play.hints.length));
+    }
+    return url.toString();
   }
 
   function shareText() {
+    if (puzzle.pool === "practice") {
+      if (play.outcome === "playing") {
+        return `Can you solve Emoji Daily Practice #${puzzle.sequenceNumber}?`;
+      }
+      const result = `${play.guessCount} ${play.guessCount === 1 ? "guess" : "guesses"} and ${play.hints.length} ${play.hints.length === 1 ? "hint" : "hints"}`;
+      return play.outcome === "solved"
+        ? `I solved Emoji Daily Practice #${puzzle.sequenceNumber} in ${result}. Can you beat my result?`
+        : `I revealed Emoji Daily Practice #${puzzle.sequenceNumber} after ${result}. Can you solve it?`;
+    }
     if (play.outcome === "playing") {
       return "Can you decode today’s Emoji Daily?";
     }
     const solved = play.outcome === "solved";
     return [
-      `Emoji Daily #${puzzle.number}`,
+      `Emoji Daily #${puzzle.dateCode}`,
       `${solved ? "🟩 Solved" : "⬜ Revealed"} · ${play.guessCount} ${play.guessCount === 1 ? "guess" : "guesses"} · ${play.hints.length} ${play.hints.length === 1 ? "hint" : "hints"}`,
       "Can you decode today’s puzzle?",
     ].join("\n");
@@ -238,9 +348,11 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
 
     try {
       await navigator.share({
-        title: `Emoji Daily #${puzzle.number}`,
+        title: puzzle.pool === "practice"
+          ? `Emoji Daily Practice #${puzzle.sequenceNumber}`
+          : `Emoji Daily #${puzzle.dateCode}`,
         text: shareText(),
-        url: dailyUrl(),
+        url: shareUrl(),
       });
       setShareState("shared");
     } catch (error) {
@@ -251,7 +363,7 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
 
   async function copyShareLink() {
     try {
-      const url = dailyUrl();
+      const url = shareUrl();
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(url);
       } else {
@@ -272,12 +384,16 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
   }
 
   function shareByMessage() {
-    window.location.href = `sms:?&body=${encodeURIComponent(`${shareText()}\n${dailyUrl()}`)}`;
+    window.location.href = `sms:?&body=${encodeURIComponent(`${shareText()}\n${shareUrl()}`)}`;
   }
 
   function shareByEmail() {
-    const subject = encodeURIComponent(`Try Emoji Daily #${puzzle.number}`);
-    const body = encodeURIComponent(`${shareText()}\n\n${dailyUrl()}`);
+    const subject = encodeURIComponent(
+      puzzle.pool === "practice"
+        ? `Try Emoji Daily Practice #${puzzle.sequenceNumber}`
+        : `Try Emoji Daily #${puzzle.dateCode}`,
+    );
+    const body = encodeURIComponent(`${shareText()}\n\n${shareUrl()}`);
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
   }
 
@@ -289,17 +405,18 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
     return id;
   }
 
-  async function sendFeedback(event: FormEvent) {
-    event.preventDefault();
-    if (!rating || feedbackState === "sending") return;
+  async function submitFeedback(nextRating: "up" | "down", nextComment: string) {
+    if (feedbackState === "sending" || feedbackState === "sent") return;
+    setRating(nextRating);
     setFeedbackState("sending");
     try {
       const response = await fetch("/api/feedback", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          rating,
-          comment,
+          rating: nextRating,
+          comment: puzzle.pool === "practice" ? "" : nextComment,
+          pool: puzzle.pool,
           ...feedbackPlayFields(puzzle, play),
           anonymousSessionId: getAnonymousSessionId(),
           metadata: {
@@ -320,27 +437,72 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
     }
   }
 
+  async function sendFeedback(event: FormEvent) {
+    event.preventDefault();
+    if (!rating) return;
+    await submitFeedback(rating, comment);
+  }
+
   return (
     <main className="game-shell">
       <header className="topbar">
-        <Link className="brand" href="/" aria-label="Emoji Daily home">
+        <button className="brand brand-button" type="button" onClick={() => switchMode("daily")} aria-label="Emoji Daily home">
           <span className="brand-mark" aria-hidden="true">◒</span>
           <span>Emoji Daily</span>
-        </Link>
+        </button>
         <div className="topbar-actions">
           <button className="topbar-share" type="button" onClick={openShareSheet} aria-label="Share Emoji Daily">
             <span aria-hidden="true">↗</span>
             <span>Share</span>
           </button>
-          <div className="day-pill">PUZZLE #{puzzle.dateCode}</div>
+          <div className="day-pill">
+            {puzzle.pool === "practice"
+              ? `PRACTICE ${puzzle.sequenceNumber}/${puzzle.sequenceLength}`
+              : puzzle.context === "daily"
+                ? `PUZZLE #${puzzle.dateCode}`
+                : `TEST #${puzzle.number}`}
+          </div>
         </div>
       </header>
 
+      <nav className="mode-switch" aria-label="Game mode">
+        <button
+          type="button"
+          className={puzzle.pool === "daily" ? "selected" : ""}
+          aria-current={puzzle.pool === "daily" ? "page" : undefined}
+          onClick={() => switchMode("daily")}
+        >
+          Daily
+        </button>
+        <button
+          type="button"
+          className={puzzle.pool === "practice" ? "selected" : ""}
+          aria-current={puzzle.pool === "practice" ? "page" : undefined}
+          onClick={() => switchMode("practice")}
+        >
+          Practice
+        </button>
+      </nav>
+
       {!isFinished ? (
         <section className="play-card" aria-labelledby="puzzle-title">
-          <div className="eyebrow">Today’s puzzle</div>
+          <div className="eyebrow">
+            {puzzle.context === "challenge"
+              ? "Practice challenge"
+              : puzzle.pool === "practice"
+                ? "Practice puzzle"
+                : puzzle.context === "daily"
+                  ? "Today’s puzzle"
+                  : "Author test"}
+          </div>
           <h1 id="puzzle-title">What do these mean?</h1>
-          <p className="intro">It could be a phrase, person, story—or something else entirely.</p>
+          <p className="intro">
+            {puzzle.context === "challenge"
+              ? challengeBenchmark?.outcome === "revealed"
+                ? "A friend revealed this one. Can you solve it?"
+                : "A friend challenged you to beat their result."
+              : "It could be a phrase, person, story—or something else entirely."}
+          </p>
 
           <div className="emoji-stage" aria-label={`Emoji puzzle: ${puzzle.emoji}`}>
             <div className="emoji-glow" aria-hidden="true" />
@@ -399,7 +561,7 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
               </button>
             ) : (
               <div className="reveal-confirm" role="group" aria-label="Confirm answer reveal">
-                <p>Give up and reveal today’s answer?</p>
+                <p>Give up and reveal {puzzle.pool === "practice" ? "this practice" : "today’s"} answer?</p>
                 <button type="button" onClick={revealAnswer} disabled={busy}>Show me</button>
                 <button type="button" onClick={() => setConfirmReveal(false)}>Keep trying</button>
               </div>
@@ -422,25 +584,57 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
             <div><strong>{play.hints.length}</strong><span>{play.hints.length === 1 ? "hint" : "hints"}</span></div>
           </div>
 
+          {puzzle.context === "challenge" && challengeBenchmark && (
+            <div className="challenge-comparison" aria-label="Challenge result comparison">
+              <div>
+                <span>Friend’s result</span>
+                <strong>{challengeBenchmark.outcome === "solved" ? "Solved" : "Revealed"}</strong>
+                <small>{challengeBenchmark.guessCount} guesses · {challengeBenchmark.hintCount} hints</small>
+              </div>
+              <div>
+                <span>Your result</span>
+                <strong>{play.outcome === "solved" ? "Solved" : "Revealed"}</strong>
+                <small>{play.guessCount} guesses · {play.hints.length} hints</small>
+              </div>
+            </div>
+          )}
+
           <button className="share-button" type="button" onClick={openShareSheet}>
             <span aria-hidden="true">↗</span> Share result
           </button>
-          {sequenceMode && nextPuzzleNumber ? (
+          {puzzle.context === "practice" ? (
+            <button className="next-button" type="button" onClick={advancePractice}>
+              Next puzzle <span aria-hidden="true">→</span>
+            </button>
+          ) : puzzle.context === "challenge" ? (
+            <button className="next-button" type="button" onClick={returnToPractice}>
+              Back to your practice <span aria-hidden="true">→</span>
+            </button>
+          ) : puzzle.context === "author-test" && nextPuzzleNumber ? (
             <Link className="next-button" href={`/next?puzzle=${nextPuzzleNumber}`}>
               Next puzzle <span aria-hidden="true">→</span>
             </Link>
-          ) : (
+          ) : puzzle.context === "daily" ? (
             <div className="next-release">
               <span>Next puzzle arrives in</span>
               <strong role="timer">{nextPuzzleCountdown || "…"}</strong>
             </div>
-          )}
+          ) : null}
 
           <aside className="feedback-card">
             {play.feedbackSent || feedbackState === "sent" ? (
               <div className="feedback-thanks">
                 <span aria-hidden="true">✓</span>
                 <div><strong>Feedback saved</strong><p>This is how the puzzles get better.</p></div>
+              </div>
+            ) : puzzle.pool === "practice" ? (
+              <div className="feedback-topline">
+                <div><strong>How was this puzzle?</strong><p>A quick rating helps tune Practice.</p></div>
+                <div className="rating-buttons" role="group" aria-label="Rate this puzzle">
+                  <button type="button" onClick={() => submitFeedback("up", "")} aria-label="Good puzzle" disabled={feedbackState === "sending"}>👍</button>
+                  <button type="button" onClick={() => submitFeedback("down", "")} aria-label="Needs work" disabled={feedbackState === "sending"}>👎</button>
+                </div>
+                {feedbackState === "error" && <p className="feedback-error">Couldn’t save that. Please try again.</p>}
               </div>
             ) : (
               <form onSubmit={sendFeedback}>
@@ -476,11 +670,15 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
             <div className="share-heading">
               <div>
                 <div className="eyebrow">Invite someone</div>
-                <h2 id="share-title">Share today’s puzzle</h2>
+                <h2 id="share-title">Share {puzzle.pool === "practice" ? "this practice puzzle" : "today’s puzzle"}</h2>
               </div>
               <button className="share-close" type="button" onClick={() => setShareOpen(false)} aria-label="Close share options">×</button>
             </div>
-            <p className="share-description">The link opens the daily puzzle. Your answer and emojis stay private.</p>
+            <p className="share-description">
+              {puzzle.pool === "practice"
+                ? "The link opens this exact puzzle as a standalone challenge. The answer and emojis stay private."
+                : "The link opens the daily puzzle. Your answer and emojis stay private."}
+            </p>
             <div className="share-options">
               <button type="button" onClick={shareByMessage}><span aria-hidden="true">💬</span><strong>Messages</strong></button>
               <button type="button" onClick={shareByEmail}><span aria-hidden="true">✉️</span><strong>Email</strong></button>
@@ -499,7 +697,7 @@ export function DailyPuzzle({ puzzle, sequenceMode, nextPuzzleNumber }: DailyPuz
       )}
 
       <footer>
-        <span>One puzzle. Every day. Everyone.</span>
+        <span>{puzzle.pool === "practice" ? "Practice at your own pace." : "One puzzle. Every day. Everyone."}</span>
         <span aria-hidden="true">No account · No feed · Just the puzzle</span>
       </footer>
     </main>

@@ -65,6 +65,13 @@ button { color: inherit; touch-action: manipulation; }
   letter-spacing: -0.02em;
 }
 
+.brand-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
 .brand-mark {
   width: 29px;
   height: 29px;
@@ -115,6 +122,41 @@ button { color: inherit; touch-action: manipulation; }
 }
 .topbar-share > span:first-child { font-size: 17px; }
 .topbar-share:hover { color: var(--ink); }
+
+.mode-switch {
+  width: fit-content;
+  margin: 16px auto -18px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  border: 1px solid rgba(24, 37, 58, 0.14);
+  border-radius: 999px;
+  padding: 4px;
+  background: rgba(255, 253, 248, 0.76);
+}
+
+.mode-switch button {
+  min-width: 104px;
+  min-height: 40px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 18px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.mode-switch button.selected {
+  color: var(--ink);
+  background: white;
+  box-shadow: 0 2px 9px rgba(24, 37, 58, .12);
+}
+
+.mode-switch button:focus-visible {
+  outline: 3px solid rgba(24, 37, 58, .22);
+  outline-offset: 2px;
+}
 
 .play-card, .result-card {
   position: relative;
@@ -351,6 +393,18 @@ h1 {
 .result-stats strong { font-size: 19px; }
 .result-stats span { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 
+.challenge-comparison {
+  max-width: 430px;
+  margin: -7px auto 21px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 9px;
+}
+.challenge-comparison div { display: grid; gap: 3px; border-radius: 12px; padding: 12px; background: #f5efdf; }
+.challenge-comparison span { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.challenge-comparison strong { font-size: 15px; }
+.challenge-comparison small { color: #626a77; font-size: 11px; }
+
 .share-button { min-width: 180px; padding: 0 27px; }
 .share-button span { margin-right: 7px; font-size: 20px; }
 .next-button {
@@ -521,6 +575,7 @@ footer span:first-child { color: var(--ink); font-family: Georgia, serif; font-s
   .topbar-actions { gap: 6px; }
   .day-pill { padding-inline: 10px; }
   .play-card, .result-card { margin-top: 23px; padding-inline: 16px; border-radius: 22px; }
+  .mode-switch { margin-top: 12px; margin-bottom: -10px; }
   .play-card { padding-top: 27px; }
   .emoji-stage { min-height: 139px; margin-top: 21px; }
   .guess-form { grid-template-columns: 1fr; }

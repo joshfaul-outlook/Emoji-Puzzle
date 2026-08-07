@@ -9,6 +9,8 @@ The core product question is whether we can repeatedly create puzzles that feel 
 ## Product invariants
 
 - One globally shared puzzle per UTC day.
+- Every new browser-tab session opens in Daily mode; Practice is an explicit session choice.
+- Daily uses the reviewed 20-puzzle rotation; Practice uses a separate append-only sequence and never affects rankings.
 - No in-game account is required.
 - The category is hidden until a hint or the result.
 - Guesses are free-form, deterministic, and unlimited.
@@ -16,7 +18,7 @@ The core product question is whether we can repeatedly create puzzles that feel 
 - Revealing the answer is explicit and ends the play.
 - The result celebrates the explanation, not a numeric score.
 - Sharing never exposes the answer or emoji sequence.
-- Feedback is thumbs up/down with an optional note.
+- Daily feedback is thumbs up/down with an optional note; Practice feedback is rating-only.
 - Basic play state is device-local; raw feedback is durable and anonymous.
 
 Do not add accounts, monetization, feeds, leaderboards, admin screens, localization, fuzzy/AI answer judging, or production-scale infrastructure unless a validated need is documented first.
@@ -55,7 +57,7 @@ Never silently add fuzzy matching. Add a missed fair answer as an authored varia
 ## Repository map
 
 - `app/` — game screen and server endpoints
-- `lib/puzzles.ts` — puzzle set, accepted answers, and configurable rules
+- `lib/puzzles.ts` — Daily and Practice puzzle pools, accepted answers, and configurable rules
 - `db/` and `drizzle/` — raw feedback schema and migration
 - `tests/` — product-invariant and mechanics tests
 - `GOALS.md` — product goals and non-goals

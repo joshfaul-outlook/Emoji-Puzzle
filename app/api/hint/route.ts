@@ -1,10 +1,11 @@
-import { getPuzzleById } from "../../../lib/puzzles";
+import { getPuzzleById, type PuzzlePool } from "../../../lib/puzzles";
 
 export async function POST(request: Request) {
   const payload = (await request.json().catch(() => null)) as
-    | { puzzleId?: string; hintIndex?: number }
+    | { puzzleId?: string; pool?: PuzzlePool; hintIndex?: number }
     | null;
-  const puzzle = payload?.puzzleId ? getPuzzleById(payload.puzzleId) : undefined;
+  const pool = payload?.pool === "daily" || payload?.pool === "practice" ? payload.pool : null;
+  const puzzle = payload?.puzzleId && pool ? getPuzzleById(payload.puzzleId, pool) : undefined;
   const hintIndex = payload?.hintIndex;
 
   if (!puzzle || !Number.isInteger(hintIndex) || (hintIndex as number) < 0) {

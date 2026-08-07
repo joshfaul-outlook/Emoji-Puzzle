@@ -15,6 +15,7 @@ The repository begins with a usable mechanics prototype:
 - durable thumbs up/down feedback with optional notes;
 - device-local play continuity and anonymous metadata;
 - temporary `/next` and `/startover` playtest routes for rapid iteration;
+- a player-facing Practice mode with device-local sequential progress and standalone result challenges;
 - a public deployment path.
 
 This baseline is intentionally small. The next work is product learning, not feature accumulation.
@@ -113,4 +114,4 @@ Before promoting beyond a controlled playtest:
 6. Decide whether a tiny first-visit instruction or example is actually needed.
 7. Add a privacy note and error monitoring before broad promotion.
 
-The `/next` route deliberately enables temporary rapid sequence testing and bypasses daily scarcity. Root and `?puzzle=N` retain normal daily behavior; `?puzzle=N` selects a direct-testing puzzle without enabling sequence mode. Remove `/next` before the daily ritual becomes the primary evaluation target.
+The `/next` route remains an unlinked author-testing tool for the Daily pool and is never ranking-eligible. Root serves the shared Daily edition; `?puzzle=N` is also an ineligible author test. Practice uses its own append-only pool, requires an explicit per-session switch, resumes device-local progress, and never contributes to future rankings.

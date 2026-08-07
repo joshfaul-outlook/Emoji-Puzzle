@@ -12,6 +12,7 @@ const CREATE_TABLE = `CREATE TABLE puzzle_feedback (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   puzzle_id TEXT NOT NULL,
   puzzle_number INTEGER NOT NULL,
+  puzzle_pool TEXT NOT NULL DEFAULT 'daily',
   rating TEXT NOT NULL,
   comment TEXT,
   created_at TEXT NOT NULL,
@@ -24,24 +25,27 @@ const CREATE_TABLE = `CREATE TABLE puzzle_feedback (
 )`;
 
 test("validates and bounds feedback report filters", () => {
-  assert.deepEqual(parseFeedbackReportFilters({}, 100), { days: 30, puzzleNumber: null });
-  assert.deepEqual(parseFeedbackReportFilters({ days: "7", puzzle: "2" }, 100), {
+  assert.deepEqual(parseFeedbackReportFilters({}, 100), { days: 30, puzzleNumber: null, pool: "all" });
+  assert.deepEqual(parseFeedbackReportFilters({ days: "7", puzzle: "2", pool: "practice" }, 100), {
     days: 7,
     puzzleNumber: 2,
+    pool: "practice",
   });
   assert.deepEqual(parseFeedbackReportFilters({ days: "999", puzzle: "101" }, 100), {
     days: 365,
     puzzleNumber: null,
+    pool: "all",
   });
   assert.deepEqual(parseFeedbackReportFilters({ days: "nope", puzzle: "-2" }, 100), {
     days: 30,
     puzzleNumber: null,
+    pool: "all",
   });
 });
 
 test("keeps every report query read-only and excludes anonymous identifiers and metadata", () => {
   const queries = buildFeedbackReportQueries(
-    { days: 30, puzzleNumber: 2 },
+    { days: 30, puzzleNumber: 2, pool: "daily" },
     new Date("2026-08-06T12:00:00Z"),
   );
   for (const query of Object.values(queries)) {
@@ -56,7 +60,7 @@ test("calculates fixed aggregate fixtures and returns only negative or written f
     await seedFeedback(db);
     const report = await getFeedbackReport(
       db,
-      { days: 30, puzzleNumber: null },
+      { days: 30, puzzleNumber: null, pool: "all" },
       new Date("2026-08-06T12:00:00Z"),
     );
 
@@ -71,6 +75,7 @@ test("calculates fixed aggregate fixtures and returns only negative or written f
       {
         puzzleId: "rain-cats-dogs",
         puzzleNumber: 1,
+        puzzlePool: "daily",
         submissionCount: 2,
         positivePercentage: 50,
         solvedPercentage: 50,
@@ -80,6 +85,7 @@ test("calculates fixed aggregate fixtures and returns only negative or written f
       {
         puzzleId: "elephant-room",
         puzzleNumber: 2,
+        puzzlePool: "daily",
         submissionCount: 1,
         positivePercentage: 100,
         solvedPercentage: 100,
@@ -102,7 +108,7 @@ test("applies the same puzzle filter to summary, breakdown, and feedback", async
     await seedFeedback(db);
     const report = await getFeedbackReport(
       db,
-      { days: 30, puzzleNumber: 1 },
+      { days: 30, puzzleNumber: 1, pool: "daily" },
       new Date("2026-08-06T12:00:00Z"),
     );
 
@@ -113,11 +119,45 @@ test("applies the same puzzle filter to summary, breakdown, and feedback", async
   });
 });
 
+test("keeps Daily and Practice feedback in separate report pools", async () => {
+  await withFixtureDatabase(async (db, sqlite) => {
+    await seedFeedback(db);
+    sqlite.prepare(`INSERT INTO puzzle_feedback (
+      puzzle_id, puzzle_number, puzzle_pool, rating, comment, created_at, play_id,
+      anonymous_session_id, outcome, guess_count, hint_count, metadata_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      "early-bird",
+      21,
+      "practice",
+      "down",
+      null,
+      "2026-08-05 13:00:00",
+      "practice-play",
+      "practice-session",
+      "solved",
+      2,
+      1,
+      "{}",
+    );
+
+    const report = await getFeedbackReport(
+      db,
+      { days: 30, puzzleNumber: null, pool: "practice" },
+      new Date("2026-08-06T12:00:00Z"),
+    );
+    assert.equal(report.summary.submissionCount, 1);
+    assert.deepEqual(report.puzzles.map(({ puzzleId, puzzlePool }) => ({ puzzleId, puzzlePool })), [
+      { puzzleId: "early-bird", puzzlePool: "practice" },
+    ]);
+    assert.equal(report.recentFeedback[0].comment, null);
+  });
+});
+
 test("returns a safe empty report before the feedback table exists", async () => {
   await withFixtureDatabase(async (db) => {
     const report = await getFeedbackReport(
       db,
-      { days: 30, puzzleNumber: null },
+      { days: 30, puzzleNumber: null, pool: "all" },
       new Date("2026-08-06T12:00:00Z"),
     );
     assert.deepEqual(report.summary, {
@@ -150,14 +190,14 @@ async function withFixtureDatabase(callback) {
 async function seedFeedback(db) {
   db.sqlite.exec(CREATE_TABLE);
   const insert = `INSERT INTO puzzle_feedback (
-    puzzle_id, puzzle_number, rating, comment, created_at, play_id,
+    puzzle_id, puzzle_number, puzzle_pool, rating, comment, created_at, play_id,
     anonymous_session_id, outcome, guess_count, hint_count, metadata_json
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   const statement = db.sqlite.prepare(insert);
-  statement.run("rain-cats-dogs", 1, "up", null, "2026-08-05 12:00:00", "p1", "s1", "solved", 1, 0, "{}");
-  statement.run("rain-cats-dogs", 1, "down", "The ending felt ambiguous.", "2026-08-04 12:00:00", "p2", "s2", "revealed", 5, 3, "{}");
-  statement.run("elephant-room", 2, "up", "Great reveal.", "2026-08-03 12:00:00", "p3", "s3", "solved", 3, 0, "{}");
-  statement.run("elephant-room", 2, "down", "Old feedback.", "2026-06-01 12:00:00", "p4", "s4", "revealed", 9, 3, "{}");
+  statement.run("rain-cats-dogs", 1, "daily", "up", null, "2026-08-05 12:00:00", "p1", "s1", "solved", 1, 0, "{}");
+  statement.run("rain-cats-dogs", 1, "daily", "down", "The ending felt ambiguous.", "2026-08-04 12:00:00", "p2", "s2", "revealed", 5, 3, "{}");
+  statement.run("elephant-room", 2, "daily", "up", "Great reveal.", "2026-08-03 12:00:00", "p3", "s3", "solved", 3, 0, "{}");
+  statement.run("elephant-room", 2, "daily", "down", "Old feedback.", "2026-06-01 12:00:00", "p4", "s4", "revealed", 9, 3, "{}");
 }
 
 class SqliteD1Adapter {

@@ -12,8 +12,17 @@ export type Puzzle = {
 
 export type PublicPuzzle = Pick<Puzzle, "id" | "number" | "emoji"> & {
   hintCount: number;
-  dateCode: string;
+  pool: PuzzlePool;
+  context: PlayContext;
+  sequenceNumber: number;
+  sequenceLength: number;
+  dateCode: string | null;
+  rankingEligible: boolean;
+  legacyStorageEligible: boolean;
 };
+
+export type PuzzlePool = "daily" | "practice";
+export type PlayContext = "daily" | "practice" | "challenge" | "author-test";
 
 export const GAME_CONFIG = {
   launchDate: "2026-08-05",
@@ -1538,6 +1547,9 @@ export const PUZZLES: Puzzle[] = [
   },
 ];
 
+export const DAILY_PUZZLES = PUZZLES.slice(0, 20);
+export const PRACTICE_PUZZLES = PUZZLES.slice(20);
+
 export function normalizeGuess(value: string) {
   return value
     .normalize("NFKD")
@@ -1565,17 +1577,30 @@ export function isAcceptedGuess(puzzle: Puzzle, guess: string) {
   });
 }
 
-export function getPuzzleById(id: string) {
-  return PUZZLES.find((puzzle) => puzzle.id === id);
+export function getPuzzlesForPool(pool: PuzzlePool) {
+  return pool === "daily" ? DAILY_PUZZLES : PRACTICE_PUZZLES;
 }
 
-export function getPuzzleByNumber(number: number) {
-  return PUZZLES.find((puzzle) => puzzle.number === number);
+export function getPuzzleById(id: string, pool?: PuzzlePool) {
+  return (pool ? getPuzzlesForPool(pool) : PUZZLES).find((puzzle) => puzzle.id === id);
 }
 
-export function getNextPuzzle(puzzle: Puzzle) {
-  const index = PUZZLES.findIndex((candidate) => candidate.id === puzzle.id);
-  return PUZZLES[(index + 1) % PUZZLES.length];
+export function getPuzzleByNumber(number: number, pool: PuzzlePool = "daily") {
+  return getPuzzlesForPool(pool).find((puzzle) => puzzle.number === number);
+}
+
+export function getPracticePuzzleByPosition(position: number) {
+  return PRACTICE_PUZZLES[position - 1];
+}
+
+export function getPuzzlePosition(puzzle: Puzzle, pool: PuzzlePool) {
+  return getPuzzlesForPool(pool).findIndex((candidate) => candidate.id === puzzle.id) + 1;
+}
+
+export function getNextPuzzle(puzzle: Puzzle, pool: PuzzlePool = "daily") {
+  const puzzles = getPuzzlesForPool(pool);
+  const index = puzzles.findIndex((candidate) => candidate.id === puzzle.id);
+  return puzzles[(index + 1) % puzzles.length];
 }
 
 export function getNextPuzzleLaunchAt(now = new Date()) {
@@ -1594,24 +1619,42 @@ export function getDailyPuzzle(now = new Date()) {
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const elapsedDays = Math.max(0, Math.floor((today - launch) / 86_400_000));
   const index = GAME_CONFIG.cycleAfterLastPuzzle
-    ? elapsedDays % PUZZLES.length
-    : Math.min(elapsedDays, PUZZLES.length - 1);
-  return PUZZLES[index];
+    ? elapsedDays % DAILY_PUZZLES.length
+    : Math.min(elapsedDays, DAILY_PUZZLES.length - 1);
+  return DAILY_PUZZLES[index];
 }
 
-export function getPuzzleDateCode(puzzle: Pick<Puzzle, "number">) {
+export function getPuzzleDateCode(now = new Date()) {
+  return now.toISOString().slice(2, 10).replace(/-/g, "");
+}
+
+function getOriginalPuzzleDateCode(puzzle: Pick<Puzzle, "number">) {
   const launch = Date.parse(`${GAME_CONFIG.launchDate}T00:00:00Z`);
-  const scheduledDate = new Date(launch + (puzzle.number - 1) * 86_400_000);
-  return scheduledDate.toISOString().slice(2, 10).replace(/-/g, "");
+  return getPuzzleDateCode(new Date(launch + (puzzle.number - 1) * 86_400_000));
 }
 
-export function toPublicPuzzle(puzzle: Puzzle): PublicPuzzle {
+export function isRankingEligible(context: PlayContext) {
+  return context === "daily";
+}
+
+export function toPublicPuzzle(
+  puzzle: Puzzle,
+  options: { pool: PuzzlePool; context: PlayContext; now?: Date },
+): PublicPuzzle {
+  const puzzles = getPuzzlesForPool(options.pool);
+  const dateCode = options.context === "daily" ? getPuzzleDateCode(options.now) : null;
   return {
     id: puzzle.id,
     number: puzzle.number,
     emoji: puzzle.emoji,
     hintCount: puzzle.hints.length,
-    dateCode: getPuzzleDateCode(puzzle),
+    pool: options.pool,
+    context: options.context,
+    sequenceNumber: getPuzzlePosition(puzzle, options.pool),
+    sequenceLength: puzzles.length,
+    dateCode,
+    rankingEligible: isRankingEligible(options.context),
+    legacyStorageEligible: dateCode !== null && dateCode === getOriginalPuzzleDateCode(puzzle),
   };
 }
 

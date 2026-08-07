@@ -1,3 +1,5 @@
+import type { PuzzlePool } from "./puzzles";
+
 export const DEFAULT_FEEDBACK_REPORT_DAYS = 30;
 export const MAX_FEEDBACK_REPORT_DAYS = 365;
 export const FEEDBACK_REPORT_COMMENT_LIMIT = 100;
@@ -5,6 +7,7 @@ export const FEEDBACK_REPORT_COMMENT_LIMIT = 100;
 export type FeedbackReportFilters = {
   days: number;
   puzzleNumber: number | null;
+  pool: PuzzlePool | "all";
 };
 
 export type FeedbackReportSummary = {
@@ -18,12 +21,14 @@ export type FeedbackReportSummary = {
 export type PuzzleFeedbackSummary = FeedbackReportSummary & {
   puzzleId: string;
   puzzleNumber: number;
+  puzzlePool: PuzzlePool;
 };
 
 export type ReviewableFeedback = {
   createdAt: string;
   puzzleId: string;
   puzzleNumber: number;
+  puzzlePool: PuzzlePool;
   rating: "up" | "down";
   outcome: "solved" | "revealed";
   guessCount: number;
@@ -72,12 +77,14 @@ type SummaryRow = {
 type PuzzleSummaryRow = SummaryRow & {
   puzzleId?: unknown;
   puzzleNumber?: unknown;
+  puzzlePool?: unknown;
 };
 
 type FeedbackRow = {
   createdAt?: unknown;
   puzzleId?: unknown;
   puzzleNumber?: unknown;
+  puzzlePool?: unknown;
   rating?: unknown;
   outcome?: unknown;
   guessCount?: unknown;
@@ -86,7 +93,7 @@ type FeedbackRow = {
 };
 
 export function parseFeedbackReportFilters(
-  input: { days?: string | number | null; puzzle?: string | number | null },
+  input: { days?: string | number | null; puzzle?: string | number | null; pool?: string | null },
   maximumPuzzleNumber: number,
 ): FeedbackReportFilters {
   const requestedDays = integerFrom(input.days);
@@ -101,7 +108,8 @@ export function parseFeedbackReportFilters(
       ? requestedPuzzle
       : null;
 
-  return { days, puzzleNumber };
+  const pool = input.pool === "daily" || input.pool === "practice" ? input.pool : "all";
+  return { days, puzzleNumber, pool };
 }
 
 export function buildFeedbackReportQueries(
@@ -109,11 +117,17 @@ export function buildFeedbackReportQueries(
   now = new Date(),
 ): FeedbackReportQueries {
   const cutoff = formatSqlTimestamp(new Date(now.getTime() - filters.days * 86_400_000));
-  const where = filters.puzzleNumber === null
-    ? "WHERE created_at >= ?"
-    : "WHERE created_at >= ? AND puzzle_number = ?";
-  const bindings: QueryBinding[] =
-    filters.puzzleNumber === null ? [cutoff] : [cutoff, filters.puzzleNumber];
+  const conditions = ["created_at >= ?"];
+  const bindings: QueryBinding[] = [cutoff];
+  if (filters.pool !== "all") {
+    conditions.push("puzzle_pool = ?");
+    bindings.push(filters.pool);
+  }
+  if (filters.puzzleNumber !== null) {
+    conditions.push("puzzle_number = ?");
+    bindings.push(filters.puzzleNumber);
+  }
+  const where = `WHERE ${conditions.join(" AND ")}`;
 
   return {
     summary: {
@@ -131,6 +145,7 @@ export function buildFeedbackReportQueries(
       sql: `SELECT
         puzzle_id AS puzzleId,
         puzzle_number AS puzzleNumber,
+        puzzle_pool AS puzzlePool,
         COUNT(*) AS submissionCount,
         ROUND(100.0 * SUM(CASE WHEN rating = 'up' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 1) AS positivePercentage,
         ROUND(100.0 * SUM(CASE WHEN outcome = 'solved' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 1) AS solvedPercentage,
@@ -138,8 +153,8 @@ export function buildFeedbackReportQueries(
         ROUND(AVG(hint_count), 1) AS averageHints
       FROM puzzle_feedback
       ${where}
-      GROUP BY puzzle_id, puzzle_number
-      ORDER BY puzzle_number ASC`,
+      GROUP BY puzzle_id, puzzle_number, puzzle_pool
+      ORDER BY puzzle_pool ASC, puzzle_number ASC`,
       bindings,
     },
     recentFeedback: {
@@ -147,6 +162,7 @@ export function buildFeedbackReportQueries(
         created_at AS createdAt,
         puzzle_id AS puzzleId,
         puzzle_number AS puzzleNumber,
+        puzzle_pool AS puzzlePool,
         rating,
         outcome,
         guess_count AS guessCount,
@@ -227,6 +243,7 @@ function normalizePuzzleSummary(row: PuzzleSummaryRow): PuzzleFeedbackSummary {
   return {
     puzzleId: requiredString(row.puzzleId),
     puzzleNumber: requiredNumber(row.puzzleNumber),
+    puzzlePool: normalizePool(row.puzzlePool),
     ...normalizeSummary(row),
   };
 }
@@ -236,6 +253,7 @@ function normalizeFeedback(row: FeedbackRow): ReviewableFeedback {
     createdAt: requiredString(row.createdAt),
     puzzleId: requiredString(row.puzzleId),
     puzzleNumber: requiredNumber(row.puzzleNumber),
+    puzzlePool: normalizePool(row.puzzlePool),
     rating: row.rating === "down" ? "down" : "up",
     outcome: row.outcome === "revealed" ? "revealed" : "solved",
     guessCount: requiredNumber(row.guessCount),
@@ -263,6 +281,10 @@ function optionalNumber(value: unknown): number | null {
 
 function requiredString(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function normalizePool(value: unknown): PuzzlePool {
+  return value === "practice" ? "practice" : "daily";
 }
 
 function formatSqlTimestamp(date: Date): string {

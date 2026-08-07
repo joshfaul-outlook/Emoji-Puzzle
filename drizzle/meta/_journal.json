@@ -15,6 +15,13 @@
       "when": 1785969886006,
       "tag": "0001_many_sphinx",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786118455517,
+      "tag": "0002_late_namor",
+      "breakpoints": true
     }
   ]
 }

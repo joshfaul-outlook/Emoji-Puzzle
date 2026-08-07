@@ -1,9 +1,10 @@
 import { insertFeedback } from "../../../db/feedback";
-import { GAME_CONFIG, getPuzzleById } from "../../../lib/puzzles";
+import { GAME_CONFIG, getPuzzleById, type PuzzlePool } from "../../../lib/puzzles";
 
 type FeedbackPayload = {
   puzzleId?: string;
   puzzleNumber?: number;
+  pool?: PuzzlePool;
   rating?: "up" | "down";
   comment?: string;
   playId?: string;
@@ -23,19 +24,22 @@ function cleanCount(value: unknown, maximum: number) {
 export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as FeedbackPayload;
-    const puzzle = payload.puzzleId ? getPuzzleById(payload.puzzleId) : undefined;
+    const pool = payload.pool === "daily" || payload.pool === "practice" ? payload.pool : null;
+    const puzzle = payload.puzzleId && pool ? getPuzzleById(payload.puzzleId, pool) : undefined;
     const comment = payload.comment?.trim() || null;
     const validRating = payload.rating === "up" || payload.rating === "down";
     const validOutcome = payload.outcome === "solved" || payload.outcome === "revealed";
 
     if (
       !puzzle ||
+      !pool ||
       puzzle.number !== payload.puzzleNumber ||
       !validRating ||
       !validOutcome ||
       !payload.playId ||
       !payload.anonymousSessionId ||
-      (comment?.length ?? 0) > GAME_CONFIG.maxCommentLength
+      (comment?.length ?? 0) > GAME_CONFIG.maxCommentLength ||
+      (pool === "practice" && comment !== null)
     ) {
       return Response.json({ error: "Invalid feedback" }, { status: 400 });
     }
@@ -43,6 +47,7 @@ export async function POST(request: Request) {
     await insertFeedback({
       puzzleId: puzzle.id,
       puzzleNumber: puzzle.number,
+      puzzlePool: pool,
       rating: payload.rating as "up" | "down",
       comment,
       playId: payload.playId.slice(0, 80),

@@ -1,0 +1,1 @@
+ALTER TABLE `puzzle_feedback` ADD `puzzle_pool` text DEFAULT 'daily' NOT NULL;

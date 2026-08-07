@@ -12,14 +12,13 @@ export default async function NextPuzzle({ searchParams }: NextPuzzleProps) {
     Number.isInteger(requestedPuzzle) && requestedPuzzle >= 1
       ? getPuzzleByNumber(requestedPuzzle) ?? getNextPuzzle(getDailyPuzzle())
       : getNextPuzzle(getDailyPuzzle());
-  const next = getNextPuzzle(selected);
+  const next = getNextPuzzle(selected, "daily");
 
-  const puzzle = toPublicPuzzle(selected);
+  const puzzle = toPublicPuzzle(selected, { pool: "daily", context: "author-test" });
   return (
     <DailyPuzzle
-      key={puzzle.id}
+      key={`${puzzle.context}:${puzzle.id}`}
       puzzle={puzzle}
-      sequenceMode
       nextPuzzleNumber={next.number}
     />
   );

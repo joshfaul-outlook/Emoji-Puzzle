@@ -11,7 +11,7 @@ The product is built around one question: can we repeatedly create puzzles that 
 ## What the base MVP includes
 
 - One globally shared daily puzzle
-- 100 varied, editable public-test puzzles
+- A 20-puzzle shared Daily rotation plus an 80-puzzle Practice sequence
 - No in-game account requirement
 - Free-form guesses with deterministic accepted variants
 - Progressive authored hints, one at a time
@@ -20,6 +20,7 @@ The product is built around one question: can we repeatedly create puzzles that 
 - Guesses and hints without a numeric score or timer
 - Spoiler-free sharing through messages, email, copy-link, and the native share menu
 - Temporary `/next` and `/startover` routes for rapid mechanics testing
+- Session-explicit Practice mode with device-local resume, fresh replay cycles, and spoiler-free challenges
 - Thumbs up/down feedback with an optional note
 - Durable anonymous raw feedback for later analysis
 - Device-local play continuity
@@ -34,7 +35,7 @@ npm install
 npm run dev
 ```
 
-Open the local address printed by the development server. Use `?puzzle=1` through `?puzzle=100` to test a specific authored puzzle; this does not enable sequence mode. Use `/next` only for temporary rapid sequence testing, which bypasses the normal daily wait. Use `/startover` to clear device-local play state and return to the current daily puzzle.
+Open the local address printed by the development server. Use `?puzzle=1` through `?puzzle=20` to test a specific Daily puzzle; this author-test context is never ranking-eligible. Use `/next` only for unlinked rapid Daily-pool testing. Players enter `/practice` through the Daily / Practice switch, and `/startover` clears device-local progress and session mode before returning to Daily.
 
 ## Verify
 
@@ -54,7 +55,7 @@ npm test
 
 ## Where to edit
 
-All puzzle content and configurable game rules live in `lib/puzzles.ts`. Answers are checked server-side and are returned only after a correct guess or explicit reveal.
+All puzzle content and configurable game rules live in `lib/puzzles.ts`. Daily uses puzzles 1–20; Practice uses the former puzzles 21–100 as positions 1–80 and accepts appended entries. Answers are checked server-side and are returned only after a correct guess or explicit reveal.
 
 The feedback schema lives in `db/schema.ts`, with a generated migration in `drizzle/`. The MVP stores raw records for separate collation and analysis; it intentionally does not include an account system, analytics dashboard, admin UI, monetization, or production-scale infrastructure.
 

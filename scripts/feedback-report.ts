@@ -27,14 +27,14 @@ try {
   await miniflare.dispose();
 }
 
-function parseArguments(args: string[]): { days?: string; puzzle?: string } {
-  const parsed: { days?: string; puzzle?: string } = {};
+function parseArguments(args: string[]): { days?: string; puzzle?: string; pool?: string } {
+  const parsed: { days?: string; puzzle?: string; pool?: string } = {};
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
-    if (argument === "--days" || argument === "--puzzle") {
+    if (argument === "--days" || argument === "--puzzle" || argument === "--pool") {
       const value = args[index + 1];
       if (!value) throw new Error(`${argument} requires a value`);
-      parsed[argument.slice(2) as "days" | "puzzle"] = value;
+      parsed[argument.slice(2) as "days" | "puzzle" | "pool"] = value;
       index += 1;
       continue;
     }
@@ -46,8 +46,12 @@ function parseArguments(args: string[]): { days?: string; puzzle?: string } {
       parsed.puzzle = argument.slice("--puzzle=".length);
       continue;
     }
+    if (argument.startsWith("--pool=")) {
+      parsed.pool = argument.slice("--pool=".length);
+      continue;
+    }
     if (argument === "--help") {
-      console.log("Usage: npm run feedback:report -- [--days 30] [--puzzle 2]");
+      console.log("Usage: npm run feedback:report -- [--days 30] [--pool daily|practice] [--puzzle 2]");
       process.exit(0);
     }
     throw new Error(`Unknown argument: ${argument}`);
@@ -60,7 +64,7 @@ function printReport(report: FeedbackReport) {
     ? "all puzzles"
     : `puzzle #${report.filters.puzzleNumber}`;
 
-  console.log(`Emoji Daily feedback report — last ${report.filters.days} days, ${scope}`);
+  console.log(`Emoji Daily feedback report — last ${report.filters.days} days, ${report.filters.pool} pool, ${scope}`);
   console.log("All metrics are among feedback submissions; they do not measure total plays or abandonment.\n");
   console.log(`Submissions: ${report.summary.submissionCount}`);
   console.log(`Positive: ${formatPercentage(report.summary.positivePercentage)}`);
@@ -74,7 +78,7 @@ function printReport(report: FeedbackReport) {
   } else {
     for (const row of report.puzzles) {
       console.log(
-        `  #${row.puzzleNumber} ${row.puzzleId}: ${row.submissionCount} submissions · ` +
+        `  ${row.puzzlePool} #${row.puzzleNumber} ${row.puzzleId}: ${row.submissionCount} submissions · ` +
         `${formatPercentage(row.positivePercentage)} positive · ` +
         `${formatPercentage(row.solvedPercentage)} solved · ` +
         `${formatDecimal(row.averageGuesses)} guesses · ${formatDecimal(row.averageHints)} hints`,
@@ -90,7 +94,7 @@ function printReport(report: FeedbackReport) {
   }
   for (const item of report.recentFeedback) {
     console.log(
-      `  ${item.createdAt} · #${item.puzzleNumber} · ${item.rating} · ${item.outcome} · ` +
+      `  ${item.createdAt} · ${item.puzzlePool} #${item.puzzleNumber} · ${item.rating} · ${item.outcome} · ` +
       `${item.guessCount} guesses · ${item.hintCount} hints`,
     );
     console.log(`    ${item.comment ?? "No written comment."}`);

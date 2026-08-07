@@ -1,10 +1,11 @@
-import { GAME_CONFIG, getPuzzleById, isAcceptedGuess, puzzleResolution } from "../../../lib/puzzles";
+import { GAME_CONFIG, getPuzzleById, isAcceptedGuess, puzzleResolution, type PuzzlePool } from "../../../lib/puzzles";
 
 export async function POST(request: Request) {
   const payload = (await request.json().catch(() => null)) as
-    | { puzzleId?: string; guess?: string }
+    | { puzzleId?: string; pool?: PuzzlePool; guess?: string }
     | null;
-  const puzzle = payload?.puzzleId ? getPuzzleById(payload.puzzleId) : undefined;
+  const pool = payload?.pool === "daily" || payload?.pool === "practice" ? payload.pool : null;
+  const puzzle = payload?.puzzleId && pool ? getPuzzleById(payload.puzzleId, pool) : undefined;
   const guess = payload?.guess?.trim() ?? "";
 
   if (!puzzle || !guess || guess.length > GAME_CONFIG.maxGuessLength) {

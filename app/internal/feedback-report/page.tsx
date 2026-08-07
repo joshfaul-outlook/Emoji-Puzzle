@@ -5,7 +5,7 @@ import { chatGPTSignOutPath, requireChatGPTUser } from "../../chatgpt-auth";
 import { loadFeedbackReport } from "../../../db/feedback-report";
 import { isFeedbackReviewer } from "../../../lib/feedback-review-auth";
 import { parseFeedbackReportFilters } from "../../../lib/feedback-report";
-import { getPuzzleByNumber, PUZZLES } from "../../../lib/puzzles";
+import { getPuzzleById, getPuzzleByNumber, PUZZLES } from "../../../lib/puzzles";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 };
 
 type ReportPageProps = {
-  searchParams: Promise<{ days?: string; puzzle?: string }>;
+  searchParams: Promise<{ days?: string; puzzle?: string; pool?: string }>;
 };
 
 export default async function FeedbackReportPage({ searchParams }: ReportPageProps) {
@@ -25,6 +25,7 @@ export default async function FeedbackReportPage({ searchParams }: ReportPagePro
   const maximumPuzzleNumber = PUZZLES.at(-1)?.number ?? PUZZLES.length;
   const filters = parseFeedbackReportFilters(params, maximumPuzzleNumber);
   const query = new URLSearchParams({ days: String(filters.days) });
+  if (filters.pool !== "all") query.set("pool", filters.pool);
   if (filters.puzzleNumber !== null) query.set("puzzle", String(filters.puzzleNumber));
   const returnTo = `/internal/feedback-report?${query.toString()}`;
 
@@ -44,7 +45,11 @@ async function ProtectedFeedbackReport({
   const report = await loadFeedbackReport(filters);
   const selectedPuzzle = filters.puzzleNumber === null
     ? null
-    : getPuzzleByNumber(filters.puzzleNumber);
+    : filters.pool === "practice"
+      ? getPuzzleByNumber(filters.puzzleNumber, "practice")
+      : filters.pool === "daily"
+        ? getPuzzleByNumber(filters.puzzleNumber)
+        : PUZZLES.find((puzzle) => puzzle.number === filters.puzzleNumber);
 
   return (
     <main className={styles.shell}>
@@ -78,10 +83,21 @@ async function ProtectedFeedbackReport({
             </select>
           </label>
           <label>
+            Pool
+            <select name="pool" defaultValue={filters.pool}>
+              <option value="all">Daily and Practice</option>
+              <option value="daily">Daily</option>
+              <option value="practice">Practice</option>
+            </select>
+          </label>
+          <label>
             Puzzle
             <select name="puzzle" defaultValue={filters.puzzleNumber ?? ""}>
               <option value="">All puzzles</option>
-              {PUZZLES.map((puzzle) => (
+              {PUZZLES.filter((puzzle) => (
+                filters.pool === "all" ||
+                (filters.pool === "daily" ? puzzle.number <= 20 : puzzle.number > 20)
+              )).map((puzzle) => (
                 <option key={puzzle.id} value={puzzle.number}>
                   #{puzzle.number} · {puzzle.emoji} · {puzzle.answer}
                 </option>
@@ -136,13 +152,13 @@ async function ProtectedFeedbackReport({
               </thead>
               <tbody>
                 {report.puzzles.map((row) => {
-                  const puzzle = getPuzzleByNumber(row.puzzleNumber);
+                  const puzzle = getPuzzleById(row.puzzleId);
                   return (
-                    <tr key={row.puzzleId}>
+                    <tr key={`${row.puzzlePool}:${row.puzzleId}`}>
                       <th scope="row">
                         <span className={styles.puzzleName}>
                           <span aria-hidden="true">{puzzle?.emoji ?? "🧩"}</span>
-                          <span>#{row.puzzleNumber} · {puzzle?.answer ?? row.puzzleId}</span>
+                          <span>{row.puzzlePool === "practice" ? "Practice" : "Daily"} #{row.puzzleNumber} · {puzzle?.answer ?? row.puzzleId}</span>
                         </span>
                       </th>
                       <td>{row.submissionCount}</td>
@@ -172,14 +188,14 @@ async function ProtectedFeedbackReport({
         ) : (
           <div className={styles.feedbackList}>
             {report.recentFeedback.map((item, index) => {
-              const puzzle = getPuzzleByNumber(item.puzzleNumber);
+              const puzzle = getPuzzleById(item.puzzleId);
               return (
                 <article className={styles.feedbackCard} key={`${item.createdAt}-${item.puzzleId}-${index}`}>
                   <div className={styles.feedbackMeta}>
                     <span className={item.rating === "down" ? styles.negative : styles.positive}>
                       {item.rating === "down" ? "Thumbs down" : "Thumbs up"}
                     </span>
-                    <span>#{item.puzzleNumber} · {puzzle?.answer ?? item.puzzleId}</span>
+                    <span>{item.puzzlePool === "practice" ? "Practice" : "Daily"} #{item.puzzleNumber} · {puzzle?.answer ?? item.puzzleId}</span>
                     <span>{item.outcome}</span>
                     <span>{item.guessCount} guesses · {item.hintCount} hints</span>
                     <time dateTime={toIsoDate(item.createdAt)}>{formatDateTime(item.createdAt)}</time>
