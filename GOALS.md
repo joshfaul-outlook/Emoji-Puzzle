@@ -39,7 +39,7 @@ The MVP exists to test that hypothesis, not to prove a complete business model.
 ## Gameplay modes
 
 - **Daily** remains the default on every new browser-tab session. Everyone receives the same UTC puzzle from the 20-puzzle Daily rotation, and only this context is eligible for future rankings.
-- **Practice** is selected explicitly and resumes device-local progress through an append-only sequence sourced from the former puzzles 21–100. It wraps with fresh attempts and collects thumbs-only feedback.
+- **Practice** is selected explicitly and resumes device-local progress through an append-only sequence: the former puzzles 21–100 plus 250 easier, pop-culture-focused additions. It wraps with fresh attempts, hides sequence numbers from players, and collects thumbs-only feedback.
 - Shared Practice links open standalone, spoiler-free challenges without changing either player’s saved Practice position.
 
 ## What success looks like in this phase

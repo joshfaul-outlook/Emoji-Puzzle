@@ -5,7 +5,7 @@ import { chatGPTSignOutPath, requireChatGPTUser } from "../../chatgpt-auth";
 import { loadFeedbackReport } from "../../../db/feedback-report";
 import { isFeedbackReviewer } from "../../../lib/feedback-review-auth";
 import { parseFeedbackReportFilters } from "../../../lib/feedback-report";
-import { getPuzzleById, getPuzzleByNumber, PUZZLES } from "../../../lib/puzzles";
+import { ALL_PUZZLES, getPuzzleById, getPuzzleByNumber } from "../../../lib/puzzles";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ type ReportPageProps = {
 
 export default async function FeedbackReportPage({ searchParams }: ReportPageProps) {
   const params = await searchParams;
-  const maximumPuzzleNumber = PUZZLES.at(-1)?.number ?? PUZZLES.length;
+  const maximumPuzzleNumber = ALL_PUZZLES.at(-1)?.number ?? ALL_PUZZLES.length;
   const filters = parseFeedbackReportFilters(params, maximumPuzzleNumber);
   const query = new URLSearchParams({ days: String(filters.days) });
   if (filters.pool !== "all") query.set("pool", filters.pool);
@@ -49,7 +49,7 @@ async function ProtectedFeedbackReport({
       ? getPuzzleByNumber(filters.puzzleNumber, "practice")
       : filters.pool === "daily"
         ? getPuzzleByNumber(filters.puzzleNumber)
-        : PUZZLES.find((puzzle) => puzzle.number === filters.puzzleNumber);
+        : ALL_PUZZLES.find((puzzle) => puzzle.number === filters.puzzleNumber);
 
   return (
     <main className={styles.shell}>
@@ -94,7 +94,7 @@ async function ProtectedFeedbackReport({
             Puzzle
             <select name="puzzle" defaultValue={filters.puzzleNumber ?? ""}>
               <option value="">All puzzles</option>
-              {PUZZLES.filter((puzzle) => (
+              {ALL_PUZZLES.filter((puzzle) => (
                 filters.pool === "all" ||
                 (filters.pool === "daily" ? puzzle.number <= 20 : puzzle.number > 20)
               )).map((puzzle) => (

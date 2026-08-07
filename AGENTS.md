@@ -10,7 +10,7 @@ The core product question is whether we can repeatedly create puzzles that feel 
 
 - One globally shared puzzle per UTC day.
 - Every new browser-tab session opens in Daily mode; Practice is an explicit session choice.
-- Daily uses the reviewed 20-puzzle rotation; Practice uses a separate append-only sequence and never affects rankings.
+- Daily uses the reviewed 20-puzzle rotation; Practice uses a separate append-only, player-unnumbered sequence of easier/pop-culture puzzles and never affects rankings.
 - No in-game account is required.
 - The category is hidden until a hint or the result.
 - Guesses are free-form, deterministic, and unlimited.

@@ -11,7 +11,7 @@ The product is built around one question: can we repeatedly create puzzles that 
 ## What the base MVP includes
 
 - One globally shared daily puzzle
-- A 20-puzzle shared Daily rotation plus an 80-puzzle Practice sequence
+- A 20-puzzle shared Daily rotation plus a 330-puzzle easier Practice sequence
 - No in-game account requirement
 - Free-form guesses with deterministic accepted variants
 - Progressive authored hints, one at a time
@@ -55,7 +55,7 @@ npm test
 
 ## Where to edit
 
-All puzzle content and configurable game rules live in `lib/puzzles.ts`. Daily uses puzzles 1–20; Practice uses the former puzzles 21–100 as positions 1–80 and accepts appended entries. Answers are checked server-side and are returned only after a correct guess or explicit reveal.
+All puzzle content and configurable game rules live in `lib/puzzles.ts`. Daily uses puzzles 1–20; Practice starts with the former puzzles 21–100 and adds 250 easier pop-culture puzzles. Practice is sequential internally but does not display progress numbers to players. Answers are checked server-side and are returned only after a correct guess or explicit reveal.
 
 The feedback schema lives in `db/schema.ts`, with a generated migration in `drizzle/`. The MVP stores raw records for separate collation and analysis; it intentionally does not include an account system, analytics dashboard, admin UI, monetization, or production-scale infrastructure.
 

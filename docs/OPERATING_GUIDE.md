@@ -43,7 +43,7 @@ Play state is stored per puzzle in the browser. Normal daily results show the ti
 
 `lib/puzzles.ts` is the single editing surface.
 
-- `PUZZLES` contains emoji, intended answer, accepted variants, category, hints, explanation, and structure.
+- `PUZZLES` contains the original authored inventory. `ADDITIONAL_PRACTICE_PUZZLES` appends easier pop-culture practice content; every entry still has emoji, an intended answer, explicit accepted variants, category, hints, explanation, and structure.
 - `GAME_CONFIG.launchDate` controls the UTC date of puzzle one.
 - `GAME_CONFIG.cycleAfterLastPuzzle` controls whether the set loops.
 - Guess and comment length limits are configurable there.

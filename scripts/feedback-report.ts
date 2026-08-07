@@ -6,12 +6,12 @@ import {
   type FeedbackReport,
   type FeedbackReportDatabase,
 } from "../lib/feedback-report.ts";
-import { PUZZLES } from "../lib/puzzles.ts";
+import { ALL_PUZZLES } from "../lib/puzzles.ts";
 
 const LOCAL_DATABASE_ID = "00000000-0000-4000-8000-000000000000";
 
 const rawFilters = parseArguments(process.argv.slice(2));
-const filters = parseFeedbackReportFilters(rawFilters, PUZZLES.at(-1)?.number ?? PUZZLES.length);
+const filters = parseFeedbackReportFilters(rawFilters, ALL_PUZZLES.at(-1)?.number ?? ALL_PUZZLES.length);
 const miniflare = new Miniflare({
   modules: true,
   script: "export default {}",

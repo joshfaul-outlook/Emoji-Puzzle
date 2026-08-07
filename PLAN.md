@@ -15,7 +15,7 @@ The repository begins with a usable mechanics prototype:
 - durable thumbs up/down feedback with optional notes;
 - device-local play continuity and anonymous metadata;
 - temporary `/next` and `/startover` playtest routes for rapid iteration;
-- a player-facing Practice mode with device-local sequential progress and standalone result challenges;
+- a player-facing, unnumbered Practice mode with device-local sequential progress and standalone result challenges;
 - a public deployment path.
 
 This baseline is intentionally small. The next work is product learning, not feature accumulation.

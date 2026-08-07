@@ -320,12 +320,12 @@ export function DailyPuzzle({
   function shareText() {
     if (puzzle.pool === "practice") {
       if (play.outcome === "playing") {
-        return `Can you solve Emoji Daily Practice #${puzzle.sequenceNumber}?`;
+        return "Can you solve this Emoji Daily practice puzzle?";
       }
       const result = `${play.guessCount} ${play.guessCount === 1 ? "guess" : "guesses"} and ${play.hints.length} ${play.hints.length === 1 ? "hint" : "hints"}`;
       return play.outcome === "solved"
-        ? `I solved Emoji Daily Practice #${puzzle.sequenceNumber} in ${result}. Can you beat my result?`
-        : `I revealed Emoji Daily Practice #${puzzle.sequenceNumber} after ${result}. Can you solve it?`;
+        ? `I solved an Emoji Daily practice puzzle in ${result}. Can you beat my result?`
+        : `I revealed an Emoji Daily practice puzzle after ${result}. Can you solve it?`;
     }
     if (play.outcome === "playing") {
       return "Can you decode today’s Emoji Daily?";
@@ -349,7 +349,7 @@ export function DailyPuzzle({
     try {
       await navigator.share({
         title: puzzle.pool === "practice"
-          ? `Emoji Daily Practice #${puzzle.sequenceNumber}`
+          ? "Emoji Daily Practice"
           : `Emoji Daily #${puzzle.dateCode}`,
         text: shareText(),
         url: shareUrl(),
@@ -390,7 +390,7 @@ export function DailyPuzzle({
   function shareByEmail() {
     const subject = encodeURIComponent(
       puzzle.pool === "practice"
-        ? `Try Emoji Daily Practice #${puzzle.sequenceNumber}`
+        ? "Try Emoji Daily Practice"
         : `Try Emoji Daily #${puzzle.dateCode}`,
     );
     const body = encodeURIComponent(`${shareText()}\n\n${shareUrl()}`);
@@ -457,7 +457,7 @@ export function DailyPuzzle({
           </button>
           <div className="day-pill">
             {puzzle.pool === "practice"
-              ? `PRACTICE ${puzzle.sequenceNumber}/${puzzle.sequenceLength}`
+              ? "PRACTICE"
               : puzzle.context === "daily"
                 ? `PUZZLE #${puzzle.dateCode}`
                 : `TEST #${puzzle.number}`}

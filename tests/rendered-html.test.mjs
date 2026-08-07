@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   DAILY_PUZZLES,
+  ADDITIONAL_PRACTICE_PUZZLES,
+  ALL_PUZZLES,
   PRACTICE_PUZZLES,
   PUZZLES,
   formatTimeUntilPuzzleLaunch,
@@ -62,12 +64,26 @@ test("ships 100 varied, fully authored puzzles for the U.S. public test", () => 
 
 test("separates the active daily rotation from the spoiler-safe practice sequence", () => {
   assert.deepEqual(DAILY_PUZZLES.map((puzzle) => puzzle.number), Array.from({ length: 20 }, (_, index) => index + 1));
-  assert.deepEqual(PRACTICE_PUZZLES.map((puzzle) => puzzle.number), Array.from({ length: 80 }, (_, index) => index + 21));
+  assert.equal(ADDITIONAL_PRACTICE_PUZZLES.length, 250);
+  assert.equal(PRACTICE_PUZZLES.length, 330);
+  assert.equal(ALL_PUZZLES.length, 350);
+  assert.deepEqual(PRACTICE_PUZZLES.slice(0, 80).map((puzzle) => puzzle.number), Array.from({ length: 80 }, (_, index) => index + 21));
+  assert.deepEqual(ADDITIONAL_PRACTICE_PUZZLES.map((puzzle) => puzzle.number), Array.from({ length: 250 }, (_, index) => index + 101));
   assert.equal(getPracticePuzzleByPosition(1).number, 21);
-  assert.equal(getPracticePuzzleByPosition(80).number, 100);
-  assert.equal(new Set([...DAILY_PUZZLES, ...PRACTICE_PUZZLES].map((puzzle) => puzzle.id)).size, 100);
+  assert.equal(getPracticePuzzleByPosition(330).number, 350);
+  assert.equal(new Set(ALL_PUZZLES.map((puzzle) => puzzle.id)).size, 350);
   assert.equal(getPuzzleById(DAILY_PUZZLES[0].id, "practice"), undefined);
   assert.equal(getPuzzleById(PRACTICE_PUZZLES[0].id, "daily"), undefined);
+});
+
+test("adds lenient authored variants for longer practice answers", () => {
+  const lordOfTheRings = ADDITIONAL_PRACTICE_PUZZLES.find((puzzle) => puzzle.id === "lord-rings-practice");
+  const peanutButter = ADDITIONAL_PRACTICE_PUZZLES.find((puzzle) => puzzle.id === "peanut-butter-jelly-practice");
+  assert.ok(lordOfTheRings);
+  assert.ok(peanutButter);
+  assert.equal(isAcceptedGuess(lordOfTheRings, "lord of rings"), true);
+  assert.equal(isAcceptedGuess(peanutButter, "pbj"), true);
+  assert.ok(lordOfTheRings.acceptedAnswers.length >= 3);
 });
 
 test("normalizes diacritics, punctuation, casing, apostrophes, ampersands, and whitespace deterministically", () => {
@@ -175,9 +191,9 @@ test("restores valid practice progress and isolates replay cycles", () => {
   const storage = memoryStorage({
     "emoji-daily-practice-progress": JSON.stringify({ position: 17, cycle: 2 }),
   });
-  assert.deepEqual(restorePracticeProgress(storage, 80), { position: 17, cycle: 2 });
+  assert.deepEqual(restorePracticeProgress(storage, 330), { position: 17, cycle: 2 });
   assert.notEqual(practicePlayStorageKey("practice-puzzle", 2), practicePlayStorageKey("practice-puzzle", 3));
-  assert.deepEqual(restorePracticeProgress(memoryStorage({ "emoji-daily-practice-progress": "broken" }), 80), { position: 1, cycle: 0 });
+  assert.deepEqual(restorePracticeProgress(memoryStorage({ "emoji-daily-practice-progress": "broken" }), 330), { position: 1, cycle: 0 });
 });
 
 test("defaults a new tab session to Daily and retains an explicit Practice selection", () => {
@@ -227,6 +243,8 @@ test("keeps answers server-side and includes the complete interaction loop", asy
   assert.match(client, /Daily/);
   assert.match(client, /Practice/);
   assert.match(client, /Can you beat my result/);
+  assert.match(client, /\? "PRACTICE"/);
+  assert.doesNotMatch(client, /PRACTICE \$\{puzzle\.sequenceNumber\}/);
   assert.match(feedback, /anonymousSessionId/);
   assert.match(feedback, /metadataJson/);
   assert.match(feedback, /pool === "practice" && comment !== null/);
