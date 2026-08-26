@@ -1,0 +1,10 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "TABLE_STORAGE_CONNECTION_STRING": "UseDevelopmentStorage=true",
+    "ADMIN_PASSWORD": "change-me",
+    "ADMIN_SESSION_SECRET": "replace-with-at-least-32-random-characters"
+  }
+}

@@ -1,4 +1,4 @@
-import type { PublicPuzzle } from "./puzzles";
+import type { PublicPuzzle } from "./public-puzzle";
 import type { PlayState } from "./play-state";
 
 export function feedbackPlayFields(

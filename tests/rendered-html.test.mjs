@@ -216,17 +216,23 @@ test("counts down to the next UTC puzzle launch in hours and minutes", () => {
   assert.equal(formatTimeUntilPuzzleLaunch(launchAt, launchAt), "0h 0m");
 });
 
-test("keeps answers server-side and includes the complete interaction loop", async () => {
-  const [page, practicePage, client, feedback, nextRoute, startOverRoute, schema] = await Promise.all([
+test("keeps answers server-side and includes the Azure interaction loop", async () => {
+  const [page, practicePage, loader, client, api, storage, admin, editor, emojiSearch, nextRoute, startOverRoute, staticConfig] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/practice/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/GameLoader.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/DailyPuzzle.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/api/feedback/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../api/src/index.ts", import.meta.url), "utf8"),
+    readFile(new URL("../api/src/storage.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/admin/AdminDashboard.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/admin/puzzle/PuzzleEditor.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/admin/puzzle/EmojiSearch.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/next/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/startover/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../staticwebapp.config.json", import.meta.url), "utf8"),
   ]);
   assert.doesNotMatch(page, /acceptedAnswers|answer:/);
+  assert.doesNotMatch(`${page}\n${practicePage}\n${loader}\n${client}`, /from ["']\.\.\/lib\/puzzles/);
   assert.match(client, /Need a hint\?/);
   assert.match(client, /Reveal answer/);
   assert.match(client, /Share result/);
@@ -249,16 +255,22 @@ test("keeps answers server-side and includes the complete interaction loop", asy
   assert.match(client, /Can you beat my result/);
   assert.match(client, /\? "PRACTICE"/);
   assert.doesNotMatch(client, /PRACTICE \$\{puzzle\.sequenceNumber\}/);
-  assert.match(feedback, /anonymousSessionId/);
-  assert.match(feedback, /metadataJson/);
-  assert.match(feedback, /pool === "practice" && comment !== null/);
-  assert.doesNotMatch(`${client}\n${feedback}\n${schema}`, /elapsedSeconds|elapsed_seconds|startedAt|endedAt/);
-  assert.match(page, /context: isAuthorTest \? "author-test" : "daily"/);
-  assert.match(practicePage, /context: isChallenge \? "challenge" : "practice"/);
-  assert.match(practicePage, /resumePractice/);
-  assert.match(nextRoute, /getNextPuzzle/);
-  assert.match(nextRoute, /nextPuzzleNumber/);
+  assert.match(api, /anonymousSessionId/);
+  assert.match(api, /pool === "practice" && comment !== null/);
+  assert.match(storage, /PuzzleCatalog/);
+  assert.match(storage, /PuzzleFeedback/);
+  assert.match(storage, /etag/);
+  assert.match(admin, /New puzzle/);
+  assert.match(editor, /Publish/);
+  assert.match(editor, /Archive/);
+  assert.match(emojiSearch, /Use suggested/);
+  assert.match(emojiSearch, /Copy/);
+  assert.match(emojiSearch, /Undo/);
+  assert.match(loader, /context === "challenge"/);
+  assert.match(practicePage, /GameLoader mode="practice"/);
+  assert.match(nextRoute, /GameLoader mode="next"/);
   assert.doesNotMatch(nextRoute, /redirect/);
+  assert.match(staticConfig, /node:22/);
   assert.match(startOverRoute, /localStorage\.clear\(\)/);
   assert.match(startOverRoute, /sessionStorage\.clear\(\)/);
   assert.match(startOverRoute, /window\.location\.replace\("\/"\)/);

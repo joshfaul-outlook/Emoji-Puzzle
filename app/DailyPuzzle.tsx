@@ -6,7 +6,7 @@ import {
   formatTimeUntilPuzzleLaunch,
   getNextPuzzleLaunchAt,
   type PublicPuzzle,
-} from "../lib/puzzles";
+} from "../lib/public-puzzle";
 import {
   ACTIVE_MODE_KEY,
   PRACTICE_PROGRESS_KEY,
@@ -281,11 +281,11 @@ export function DailyPuzzle({
   function switchMode(mode: "daily" | "practice") {
     sessionStorage.setItem(ACTIVE_MODE_KEY, mode);
     if (mode === "daily") {
-      window.location.assign("/");
+      window.location.replace("/");
       return;
     }
     const progress = restorePracticeProgress(localStorage, Number.MAX_SAFE_INTEGER);
-    window.location.assign(`/practice?puzzle=${progress.position}`);
+    window.location.replace(`/practice?puzzle=${progress.position}`);
   }
 
   function advancePractice() {
@@ -296,13 +296,13 @@ export function DailyPuzzle({
     };
     localStorage.setItem(PRACTICE_PROGRESS_KEY, JSON.stringify(nextProgress));
     sessionStorage.setItem(ACTIVE_MODE_KEY, "practice");
-    window.location.assign(`/practice?puzzle=${nextProgress.position}`);
+    window.location.replace(`/practice?puzzle=${nextProgress.position}`);
   }
 
   function returnToPractice() {
     const progress = restorePracticeProgress(localStorage, Number.MAX_SAFE_INTEGER);
     sessionStorage.setItem(ACTIVE_MODE_KEY, "practice");
-    window.location.assign(`/practice?puzzle=${progress.position}`);
+    window.location.replace(`/practice?puzzle=${progress.position}`);
   }
 
   function shareUrl() {

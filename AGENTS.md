@@ -21,13 +21,13 @@ The core product question is whether we can repeatedly create puzzles that feel 
 - Daily feedback is thumbs up/down with an optional note; Practice feedback is rating-only.
 - Basic play state is device-local; raw feedback is durable and anonymous.
 
-Do not add accounts, monetization, feeds, leaderboards, admin screens, localization, fuzzy/AI answer judging, or production-scale infrastructure unless a validated need is documented first.
+Do not add player accounts, monetization, feeds, leaderboards, localization, fuzzy/AI answer judging, or infrastructure beyond the documented Azure production stack unless a validated need is documented first.
 
 ## Working principles
 
 1. Preserve the daily ritual. The first viewport should remain the puzzle, not navigation or explanation.
 2. Change one meaningful mechanic at a time when possible so playtest results remain interpretable.
-3. Keep content separate from mechanics. Puzzle edits belong in `lib/puzzles.ts`; rule changes belong in `GAME_CONFIG`.
+3. Keep content separate from mechanics. Production puzzle edits belong in the admin portal; `lib/puzzles.ts` is the idempotent seed fixture. Rule changes belong in the API game configuration.
 4. Prefer explicit data and small functions over abstractions built for hypothetical future needs.
 5. Keep answers server-side. Never place accepted answers or explanations in the initial page payload.
 6. Collect only useful anonymous context. Do not add names, email addresses, fingerprinting, or precise IP-derived location.
@@ -56,9 +56,10 @@ Never silently add fuzzy matching. Add a missed fair answer as an authored varia
 
 ## Repository map
 
-- `app/` — game screen and server endpoints
-- `lib/puzzles.ts` — Daily and Practice puzzle pools, accepted answers, and configurable rules
-- `db/` and `drizzle/` — raw feedback schema and migration
+- `app/` — statically exported game and admin screens
+- `api/` — Azure Functions, Table Storage access, seed/import tools, and API tests
+- `lib/puzzles.ts` — Daily and Practice seed inventory
+- `infra/` — subscription-level Bicep for the production Azure stack
 - `tests/` — product-invariant and mechanics tests
 - `GOALS.md` — product goals and non-goals
 - `PLAN.md` — staged MVP plan and decision gates

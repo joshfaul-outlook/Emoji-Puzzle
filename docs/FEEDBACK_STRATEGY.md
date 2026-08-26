@@ -20,7 +20,7 @@ This combines explicit sentiment with enough play context to interpret it. It in
 
 ## Review cadence
 
-During the ongoing 100-puzzle public test, review feedback after every five new feedback submissions or every three days, whichever comes first. This cadence applies to staged review batches, not to a claim that all authored puzzles are already validated.
+During the ongoing public test, review feedback after every five new feedback submissions or every three days, whichever comes first. This cadence applies to staged review batches, not to a claim that all 350 authored puzzles are already validated.
 
 For each puzzle, summarize:
 

@@ -1,117 +1,27 @@
-# Refined MVP Plan
+# Product and Operations Plan
 
 ## Current baseline
 
-The repository begins with a usable mechanics prototype:
+Emoji Daily ships as a mobile-first static web app with a same-origin Azure API. It has one shared UTC Daily puzzle, a separate 330-puzzle Practice sequence, deterministic answer matching, three authored hints, explicit reveal, spoiler-free sharing, device-local play continuity, and anonymous feedback.
 
-- a branded, mobile-first daily puzzle screen;
-- 100 editable public-test puzzles aimed at a broad U.S. audience;
-- a UTC-based shared daily rotation;
-- server-side answer checking with explicit variants;
-- unlimited guesses and three progressive hints;
-- explicit give-up/reveal and an explanation-led result;
-- guess count and hint count;
-- spoiler-free sharing through messaging, email, copy-link, and native share options;
-- durable thumbs up/down feedback with optional notes;
-- device-local play continuity and anonymous metadata;
-- temporary `/next` and `/startover` playtest routes for rapid iteration;
-- a player-facing, unnumbered Practice mode with device-local sequential progress and standalone result challenges;
-- a public deployment path.
+Azure Table Storage is the production source of truth. The private `/admin/` portal supports searching, drafting, editing, publishing, archiving, restoring, emoji keyword search, phrase suggestions, and feedback review. The original 350 records remain an idempotent migration fixture.
 
-This baseline is intentionally small. The next work is product learning, not feature accumulation.
+## Product learning
 
-## Phase 1: Validate the mechanics
+1. Use player feedback to identify answer variants, ambiguous emoji choices, and weak explanations.
+2. Revise one meaningful mechanic at a time so results remain interpretable.
+3. Keep a reviewed Daily buffer while using Practice for broader inventory.
+4. Add analytics only when anonymous result feedback cannot answer a documented product question.
 
-Run small, representative batches from the 100-puzzle public-test inventory with a small group and watch for:
+## Release gates
 
-- whether the task is understood without explanation;
-- how people phrase correct answers;
-- when they request each hint;
-- whether “Reveal answer” feels clear and non-punitive;
-- whether the result creates a genuine “ohhh” moment;
-- whether the share result feels worth sending;
-- whether feedback is easy enough to leave.
+- All frontend/API tests, lint, TypeScript builds, and static export pass.
+- Static output contains no accepted answers, unrevealed hints, credentials, or storage configuration.
+- Production tables are seeded and Daily/Practice positions reconcile with the fixture.
+- Gameplay, feedback, login, CRUD, archive/restore, ETag conflict, and emoji-helper flows work on touch and keyboard.
+- Layouts work without horizontal overflow from 320px through desktop, in portrait and landscape.
+- The generated Azure hostname passes HTTPS smoke tests before any custom-domain change.
 
-Make one-at-a-time experiments in this order:
+## Deferred work
 
-1. Answer acceptance gaps and confusing error copy.
-2. Hint sequence, wording, and timing.
-3. Reveal confirmation and result pacing.
-4. Share language and result representation.
-5. Daily return cue.
-
-Do not add lives, guess limits, streak pressure, or a score until observed behavior identifies a real problem they would solve.
-
-## Phase 2: Establish the puzzle engine
-
-Use feedback from the first set to create a repeatable authoring workflow:
-
-1. Draft the intended answer and clue mapping.
-2. Generate plausible competing answers.
-3. Revise until the intended answer is distinguishable.
-4. Write accepted variants explicitly.
-5. Author three hints from broad to specific.
-6. Write the reveal explanation.
-7. Blind-test with at least three people.
-8. Record difficulty, ambiguity, delight, and missed variants.
-9. Publish only after the reveal consistently feels fair.
-
-Review, approve, and schedule the authored inventory in small groups so early feedback can improve later puzzles before their scheduled day. Authoring a schema-complete puzzle does not make it reviewed or scheduled.
-
-## Phase 3: Improve the learning loop
-
-After enough plays exist to compare puzzles:
-
-- collate feedback by puzzle and structure;
-- compare solved versus revealed outcomes;
-- examine hint depth and guess count distributions;
-- tag comments for ambiguity, delight, difficulty, reference familiarity, and technical problems;
-- maintain a short puzzle postmortem with the specific revision or lesson.
-
-Add event-level analytics only if raw result feedback cannot answer an important product question. Keep any new collection anonymous and documented.
-
-## Phase 4: Public MVP readiness
-
-Before promoting beyond a controlled playtest:
-
-- replace or re-sequence weak puzzles;
-- build at least a 14-day reviewed content buffer;
-- confirm feedback retention and export access;
-- add lightweight error monitoring;
-- verify share previews and public access on common mobile browsers;
-- write a minimal privacy note describing local play state and anonymous feedback;
-- decide what happens after the last scheduled puzzle without surprising players.
-
-## Decision gates
-
-### Keep investing when
-
-- several puzzle structures reliably create delight;
-- players voluntarily return or share;
-- feedback produces clear content improvements;
-- the team can maintain the authoring quality bar.
-
-### Rework the mechanic when
-
-- accepted-answer maintenance dominates iteration;
-- players need instructions before every puzzle;
-- reveals routinely feel arbitrary;
-- hint usage does not rescue ambiguous puzzles.
-
-### Stop or reposition when
-
-- even the strongest tested puzzles do not produce an “aha”;
-- variety consistently feels like randomness rather than discovery;
-- daily scarcity does not create anticipation or return behavior.
-
-## Near-term backlog
-
-1. Audit the 100-puzzle pool in small, representative batches using the temporary `/next` route; use `/startover` to simulate a new player.
-2. Review feedback submissions after every five new submissions or every three days, whichever comes first.
-3. Revise accepted variants and wording without changing multiple mechanics at once.
-4. Approve and schedule only reviewed puzzles for the daily rotation; replace or revise weak puzzles before their scheduled day.
-5. Audit upcoming five-puzzle batches for ambiguity, reference familiarity, and missed fair answer variants.
-6. Decide whether a tiny first-visit instruction or example is actually needed.
-7. Add a privacy note and error monitoring before broad promotion.
-
-The `/next` route remains an unlinked author-testing tool for the Daily pool and is never ranking-eligible. Root serves the shared Daily edition; `?puzzle=N` is also an ineligible author test. Practice uses its own append-only pool, requires an explicit per-session switch, resumes device-local progress, and never contributes to future rankings.
+Player accounts, roles, audit logs, bulk operations, hard deletion, AI suggestions, fuzzy judging, monetization, leaderboards, localization, and Standard-plan features remain out of scope until usage establishes a need.

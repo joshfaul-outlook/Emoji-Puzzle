@@ -1,64 +1,40 @@
 # Emoji Daily
 
-> One puzzle. Every day. Everyone.
+One globally shared emoji puzzle per UTC day, plus a separate Practice sequence and a private mobile-first puzzle administration portal.
 
-[Play the live game](https://emoji-daily-playtest.josh-faul.chatgpt.site)
+## Architecture
 
-Emoji Daily is a deliberately small consumer web game. Everyone receives the same emoji puzzle each UTC day and tries to decode what it means. The answer might be a phrase, person, story, movie, event, or concept—the category itself is part of the mystery.
+- Next.js static export hosted on Azure Static Web Apps Free
+- Node 22 managed Azure Functions under `/api`
+- Azure Table Storage tables `PuzzleCatalog` and `PuzzleFeedback`
+- Signed static-password admin sessions
+- Bundled Emojibase keyword search and deterministic phrase suggestions
 
-The product is built around one question: can we repeatedly create puzzles that feel surprising before the answer and inevitable afterward?
+The original 350-puzzle TypeScript inventory is retained only as the seed and test fixture. Production gameplay and administration read from Table Storage. The previous Sites/D1 deployment is dormant and is not changed by this repository.
 
-## What the base MVP includes
+## Local development
 
-- One globally shared daily puzzle
-- A 20-puzzle shared Daily rotation plus a 330-puzzle easier Practice sequence
-- No in-game account requirement
-- Free-form guesses with deterministic accepted variants
-- Progressive authored hints, one at a time
-- Explicit reveal/give-up flow
-- Explanation-led solve and reveal states
-- Guesses and hints without a numeric score or timer
-- Spoiler-free sharing through messages, email, copy-link, and the native share menu
-- Temporary `/next` and `/startover` routes for rapid mechanics testing
-- Session-explicit Practice mode with device-local resume, fresh replay cycles, and spoiler-free challenges
-- Thumbs up/down feedback with an optional note
-- Durable anonymous raw feedback for later analysis
-- Device-local play continuity
-- Mobile-first, accessible branded interface
-
-## Start locally
-
-Requires Node.js 22.13 or newer.
+Use Node 22.13 or newer. Install Azure Functions Core Tools v4, then:
 
 ```bash
 npm install
-npm run dev
+npm install --prefix api
+cp api/local.settings.example.json api/local.settings.json
+npm run dev:storage
 ```
 
-Open the local address printed by the development server. Use `?puzzle=1` through `?puzzle=20` to test a specific Daily puzzle; this author-test context is never ranking-eligible. Use `/next` only for unlinked rapid Daily-pool testing. Players enter `/practice` through the Daily / Practice switch, and `/startover` clears device-local progress and session mode before returning to Daily.
+In separate terminals run `npm run dev` and `npm run dev:azure`. Seed Azurite with `npm run seed` while `TABLE_STORAGE_CONNECTION_STRING=UseDevelopmentStorage=true` is set.
 
-## Verify
+Open the URL printed by the Static Web Apps CLI. Game routes are `/`, `/practice/`, `/next/`, and `/startover/`; administration is at `/admin/`.
+
+## Verification
 
 ```bash
-npm run build
 npm run lint
 npm test
+npm run api:test
+npm run api:build
+npm run build
 ```
 
-## Product and operating docs
-
-- [Product goals](GOALS.md)
-- [Refined MVP plan](PLAN.md)
-- [Agent guidelines](AGENTS.md)
-- [Operating guide](docs/OPERATING_GUIDE.md)
-- [Engagement and feedback strategy](docs/FEEDBACK_STRATEGY.md)
-
-## Where to edit
-
-All puzzle content and configurable game rules live in `lib/puzzles.ts`. Daily uses puzzles 1–20; Practice starts with the former puzzles 21–100 and adds 250 easier pop-culture puzzles. Practice is sequential internally but does not display progress numbers to players. Answers are checked server-side and are returned only after a correct guess or explicit reveal.
-
-The feedback schema lives in `db/schema.ts`, with a generated migration in `drizzle/`. The MVP stores raw records for separate collation and analysis; it intentionally does not include an account system, analytics dashboard, admin UI, monetization, or production-scale infrastructure.
-
-## Status
-
-This repository is the branded starting point for mechanics and puzzle-quality iteration. The 100-puzzle pool is experimental authored inventory, not a claim that every puzzle has been blind-tested or approved for the daily rotation. Review, revise, approve, and schedule puzzles in small batches.
+See [the operating guide](docs/OPERATING_GUIDE.md) for Azure provisioning, secrets, deployment, feedback import, custom domains, and incident guidance.

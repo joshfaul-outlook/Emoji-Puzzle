@@ -1,0 +1,18 @@
+{
+  "platform": { "apiRuntime": "node:22" },
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/api/*", "/*.{css,js,json,png,jpg,jpeg,gif,svg,ico,woff,woff2}"]
+  },
+  "globalHeaders": {
+    "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "X-Content-Type-Options": "nosniff",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()"
+  },
+  "routes": [
+    { "route": "/admin", "headers": { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" } },
+    { "route": "/admin*", "headers": { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" } }
+  ],
+  "mimeTypes": { ".json": "application/json" }
+}

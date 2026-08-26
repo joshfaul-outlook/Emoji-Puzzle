@@ -56,7 +56,7 @@ We are looking for directional evidence, not a composite score:
 
 ## Playtest set
 
-The 100-puzzle public-test pool intentionally covers literal translation, idioms, rebus logic, American places and history, famous people, books, movies, music, television, food, sports, holidays, and interpretive questions. The references are selected for broad recognition by a U.S. audience. This is authored inventory, not a claim that all 100 puzzles are reviewed or scheduled: blind testing and feedback determine which subsets are approved for the daily rotation and which need revision or replacement.
+The 350-puzzle seed inventory intentionally covers literal translation, idioms, rebus logic, American places and history, famous people, books, movies, music, television, food, sports, holidays, and interpretive questions. The references are selected for broad recognition by a U.S. audience. This is authored inventory, not a claim that every puzzle is reviewed or scheduled: blind testing and feedback determine which records are approved for the Daily rotation and which need revision or replacement.
 
 ## Non-goals
 
@@ -65,7 +65,7 @@ This starting point does not attempt to build:
 - accounts, profiles, or cross-device progress;
 - monetization or subscriptions;
 - social feeds, comments, or competitive leaderboards;
-- an admin dashboard or content management system;
+- player-facing accounts or social content management;
 - AI or fuzzy answer adjudication;
 - localization;
 - a year of puzzle inventory;
