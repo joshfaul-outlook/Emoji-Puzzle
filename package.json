@@ -18,17 +18,20 @@
     "seed": "npm --prefix api run seed"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "emojibase-data": "17.0.0",
     "next": "16.3.3",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },
   "devDependencies": {
+    "@azure/static-web-apps-cli": "2.0.10",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "@azure/static-web-apps-cli": "2.0.10",
     "azurite": "3.37.0",
     "eslint": "9.39.4",
     "eslint-config-next": "16.3.3",

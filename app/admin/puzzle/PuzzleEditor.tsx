@@ -24,6 +24,8 @@ export function PuzzleEditor() {
 
   const load = useCallback(async () => {
     if (id === null) return;
+    const session = await fetch("/api/manage/session", { cache: "no-store" });
+    if (!session.ok || !(await session.json() as { authenticated?: boolean }).authenticated) { setAuth("signed-out"); return; }
     if (!id) { setPuzzle(blank); setAuth("signed-in"); return; }
     const response = await fetch(`/api/manage/puzzles/${encodeURIComponent(id)}`, { cache: "no-store" });
     if (response.status === 401) { setAuth("signed-out"); return; }

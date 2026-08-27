@@ -81,8 +81,8 @@ input, textarea, select { font-size: 16px; }
 .puzzle-row:hover { border-color: #aaa293; transform: translateY(-1px); }
 .puzzle-row-link { min-width: 0; display: grid; grid-template-columns: 170px 110px minmax(0,1fr) auto 20px; align-items: center; gap: 12px; color: var(--ink); text-decoration: none; }
 .puzzle-number { display: grid; gap: 2px; color: var(--muted); font-size: 12px; font-weight: 900; }.puzzle-number small { font-size: 10px; font-weight: 700; }
-.drag-handle { align-self: center; width: 38px; min-height: 48px; border: 0; border-radius: 10px; color: var(--muted); background: transparent; cursor: grab; font-size: 24px; touch-action: none; }.drag-handle:active { cursor: grabbing; background: #eee8dd; }
-.puzzle-row.is-moving { opacity: .55; }
+.drag-handle { align-self: center; width: 38px; min-height: 48px; border: 0; border-radius: 10px; color: var(--muted); background: transparent; cursor: grab; font-size: 24px; touch-action: none; }.drag-handle:active { cursor: grabbing; background: #eee8dd; }.drag-handle:disabled { cursor: wait; opacity: .55; }
+.puzzle-row.is-moving { z-index: 2; opacity: .72; box-shadow: 0 14px 28px rgba(24,37,58,.16); }
 .puzzle-row-emoji { overflow: hidden; font-size: 22px; white-space: nowrap; }
 .puzzle-row-main { min-width: 0; display: grid; gap: 4px; }
 .puzzle-row-main strong, .puzzle-row-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -1,5 +1,5 @@
 import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from "@azure/functions";
-import { adminConfigured, clearSessionCookie, createSessionCookie, passwordAccepted } from "./auth.js";
+import { adminConfigured, clearSessionCookie, createSessionCookie, isAdmin, passwordAccepted } from "./auth.js";
 import { body, json, requireAdmin, requireOrigin } from "./http.js";
 import { isAcceptedGuess, validatePuzzle, type PuzzlePool, type PuzzleStatus, type StoredPuzzle } from "./model.js";
 import { createPuzzle, getPuzzle, insertFeedback, listFeedback, listPuzzles, updatePuzzle } from "./storage.js";
@@ -86,6 +86,7 @@ async function feedback(request: HttpRequest) {
 }
 
 async function session(request: HttpRequest) {
+  if (request.method === "GET") return json({ authenticated: isAdmin(request), configured: adminConfigured() });
   const denied = requireOrigin(request); if (denied) return denied;
   if (request.method === "DELETE") return json({ signedOut: true }, 200, { "set-cookie": clearSessionCookie() });
   if (!adminConfigured()) return json({ error: "Administration is not configured" }, 503);
@@ -156,7 +157,7 @@ app.http("guess", { methods: ["POST"], authLevel: "anonymous", route: "guess", h
 app.http("hint", { methods: ["POST"], authLevel: "anonymous", route: "hint", handler: handle(hint) });
 app.http("reveal", { methods: ["POST"], authLevel: "anonymous", route: "reveal", handler: handle(reveal) });
 app.http("feedback", { methods: ["POST"], authLevel: "anonymous", route: "feedback", handler: handle(feedback) });
-app.http("adminSession", { methods: ["POST", "DELETE"], authLevel: "anonymous", route: "manage/session", handler: handle(session) });
+app.http("adminSession", { methods: ["GET", "POST", "DELETE"], authLevel: "anonymous", route: "manage/session", handler: handle(session) });
 app.http("adminPuzzles", { methods: ["GET", "POST"], authLevel: "anonymous", route: "manage/puzzles", handler: handle(adminPuzzles) });
 app.http("adminPuzzle", { methods: ["GET", "PATCH", "DELETE"], authLevel: "anonymous", route: "manage/puzzles/{id}", handler: handle(adminPuzzle) });
 app.http("adminFeedback", { methods: ["GET"], authLevel: "anonymous", route: "manage/feedback", handler: handle(adminFeedback) });
