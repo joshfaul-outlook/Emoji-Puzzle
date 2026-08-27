@@ -148,8 +148,7 @@ input, textarea, select { font-size: 16px; }
 
 .brand-mark { display: none; }
 .brand-wordmark { display: inline-block; font-family: var(--font-brand); font-size: inherit; font-weight: 800; letter-spacing: -.065em; line-height: .92; color: var(--brand-graphite); }
-.knowing-mark { --mark-feature: var(--brand-ivory); display: block; color: var(--brand-slate); flex: 0 0 auto; }
-.knowing-mark--inverse { --mark-feature: var(--brand-slate); color: var(--brand-ivory); }
+.knowing-mark { display: block; flex: 0 0 auto; }
 
 .day-pill, .category-pill {
   display: inline-flex;
@@ -405,6 +404,8 @@ h1 {
 .reveal-confirm button:first-of-type { border-color: var(--brand-slate); color: var(--brand-slate); }
 
 .result-card { padding: 39px 22px 25px; }
+.result-brand-mark { display: flex; justify-content: center; margin-bottom: 10px; }
+.result-brand-mark .knowing-mark { display: block; }
 .result-card.solved { border-top: 5px solid var(--brand-gold); }
 .result-card.revealed { border-top: 5px solid #aab6c1; }
 .result-card.solved { border-top-color: var(--brand-gold); }

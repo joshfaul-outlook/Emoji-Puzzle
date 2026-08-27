@@ -574,7 +574,8 @@ export function DailyPuzzle({
           <div className="confetti" aria-hidden="true">
             <i /><i /><i /><i /><i /><i />
           </div>
-          <div className="result-kicker"><KnowingMark size={44} />{play.outcome === "solved" ? "Aha—you got it!" : "Here’s the answer"}</div>
+          <div className="result-brand-mark" aria-hidden="true"><KnowingMark size={48} /></div>
+          <div className="result-kicker">{play.outcome === "solved" ? "Aha—you got it!" : "Here’s the answer"}</div>
           <div className="result-emoji" aria-hidden="true">{puzzle.emoji}</div>
           <div className="category-pill">{play.resolution?.category}</div>
           <h1 id="result-title">{play.resolution?.answer}</h1>
