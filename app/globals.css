@@ -149,7 +149,7 @@ input, textarea, select { font-size: 16px; }
 .brand-mark { display: none; }
 .brand-wordmark { display: inline-block; font-family: var(--font-brand); font-size: inherit; font-weight: 800; letter-spacing: -.065em; line-height: .92; color: var(--brand-graphite); }
 .knowing-mark { display: block; flex: 0 0 auto; }
-.header-brand-mark { width: 36px; height: 36px; }
+.header-brand-mark { width: 42px; height: 42px; }
 
 .day-pill, .category-pill {
   display: inline-flex;
@@ -627,7 +627,7 @@ footer span:first-child { color: var(--ink); font-family: Georgia, serif; font-s
   }
   .topbar { min-height: 66px; }
   .brand { font-size: 18px; }
-  .header-brand-mark { width: 32px; height: 32px; }
+  .header-brand-mark { width: 38px; height: 38px; }
   .brand-mark { width: 27px; height: 27px; }
   .topbar-share > span:last-child { display: none; }
   .topbar-actions { gap: 6px; }
