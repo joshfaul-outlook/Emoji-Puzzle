@@ -631,7 +631,7 @@ footer span:first-child { color: var(--ink); font-family: Georgia, serif; font-s
   .brand-mark { width: 27px; height: 27px; }
   .topbar-share > span:last-child { display: none; }
   .topbar-actions { gap: 6px; }
-  .day-pill { padding-inline: 10px; }
+  .topbar .day-pill { min-height: 26px; padding: 4px 7px; font-size: 11px; letter-spacing: .03em; }
   .play-card, .result-card { margin-top: 23px; padding-inline: 16px; border-radius: 22px; }
   .mode-switch { margin-top: 12px; margin-bottom: -10px; }
   .play-card { padding-top: 27px; }

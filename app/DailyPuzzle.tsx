@@ -461,13 +461,13 @@ export function DailyPuzzle({
             </svg>
             <span>Share</span>
           </button>
-          <div className="day-pill">
-            {puzzle.pool === "practice"
-              ? "PRACTICE"
-              : puzzle.context === "daily"
-                ? `PUZZLE #${puzzle.dateCode}`
+          {puzzle.pool !== "practice" && (
+            <div className="day-pill">
+              {puzzle.context === "daily"
+                ? puzzle.dateCode
                 : `TEST #${puzzle.number}`}
-          </div>
+            </div>
+          )}
         </div>
       </header>
 
