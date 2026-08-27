@@ -32,7 +32,7 @@ The import uses stable hashes, so rerunning it does not duplicate records. Recon
 
 ## Custom domain and SSL
 
-Deploy and verify the generated `azurestaticapps.net` hostname first. For a custom domain, configure Azure’s requested TXT validation and CNAME/ALIAS records, then redeploy with the `customDomain` Bicep parameter. This also sets the API `SITE_ORIGIN` application setting to `https://<customDomain>`; leave the parameter blank to retain the generated Azure hostname. Static Web Apps Free automatically provisions and renews SSL. Do not change unrelated DNS records.
+Deploy and verify the generated `azurestaticapps.net` hostname first. The Bicep default custom domain is `emojizzle.com`; configure Azure’s requested TXT validation and CNAME/ALIAS records before deploying it. This also sets the API `SITE_ORIGIN` application setting to `https://emojizzle.com`; pass `customDomain=''` only when the generated Azure hostname is required. Static Web Apps Free automatically provisions and renews SSL. Do not change unrelated DNS records.
 
 ## Mobile acceptance and incidents
 

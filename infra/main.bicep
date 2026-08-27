@@ -11,8 +11,8 @@ param adminPassword string
 param adminSessionSecret string
 @description('Email that receives the $1 monthly budget alert.')
 param budgetEmail string
-@description('Optional custom hostname. Leave blank for the generated Azure hostname.')
-param customDomain string = ''
+@description('Production custom hostname. Set to an empty string only to use the generated Azure hostname.')
+param customDomain string = 'emojizzle.com'
 @description('First day of the current month, generated at deployment time.')
 param budgetStartDate string = utcNow('yyyy-MM-01')
 
