@@ -12,7 +12,11 @@ export const metadata: Metadata = {
     description: "Decode today's shared emoji puzzle. One puzzle, every day, no account needed.",
     alternates: { canonical: "https://emojizzle.com/" },
     icons: {
-      icon: "/brand/favicon.svg",
+      icon: [
+        { url: "/favicon.svg", type: "image/svg+xml" },
+        { url: "/brand/icon-192.png", type: "image/png", sizes: "192x192" },
+      ],
+      shortcut: "/favicon.svg",
       apple: "/brand/apple-touch-icon.png",
     },
     openGraph: {
