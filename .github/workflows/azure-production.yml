@@ -17,6 +17,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
+    env:
+      PRODUCTION_HOSTNAME: emojizzle.com
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -44,7 +46,7 @@ jobs:
           ADMIN_SESSION_SECRET: ${{ secrets.ADMIN_SESSION_SECRET }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          az deployment group create --name emoji-daily-production --resource-group emoji-daily-prod-rg --template-file infra/resources.bicep --parameters location=eastus2 appName=emoji-daily-prod adminPassword="$ADMIN_PASSWORD" adminSessionSecret="$ADMIN_SESSION_SECRET" openAiApiKey="$OPENAI_API_KEY" --output none
+          az deployment group create --name emoji-daily-production --resource-group emoji-daily-prod-rg --template-file infra/resources.bicep --parameters location=eastus2 appName=emoji-daily-prod adminPassword="$ADMIN_PASSWORD" adminSessionSecret="$ADMIN_SESSION_SECRET" openAiApiKey="$OPENAI_API_KEY" customDomain="$PRODUCTION_HOSTNAME" --output none
           site_name=$(az deployment group show --name emoji-daily-production --resource-group emoji-daily-prod-rg --query properties.outputs.staticWebAppName.value --output tsv)
           storage_name=$(az deployment group show --name emoji-daily-production --resource-group emoji-daily-prod-rg --query properties.outputs.storageAccountName.value --output tsv)
           deploy_token=$(az staticwebapp secrets list --name "$site_name" --resource-group emoji-daily-prod-rg --query properties.apiKey --output tsv)
@@ -59,7 +61,7 @@ jobs:
 
       - name: Build static frontend
         env:
-          NEXT_PUBLIC_SITE_URL: https://${{ steps.infra.outputs.hostname }}
+          NEXT_PUBLIC_SITE_URL: https://${{ env.PRODUCTION_HOSTNAME }}
         run: |
           npm run build
           cp staticwebapp.config.json out/staticwebapp.config.json
@@ -82,6 +84,13 @@ jobs:
 
       - name: Smoke test production
         run: |
-          hostname=$(az deployment group show --name emoji-daily-production --resource-group emoji-daily-prod-rg --query properties.outputs.defaultHostname.value --output tsv)
-          curl --fail --retry 5 --retry-delay 5 "https://$hostname/"
-          curl --fail --retry 5 --retry-delay 5 "https://$hostname/api/puzzles/current?mode=daily"
+          site_url="https://$PRODUCTION_HOSTNAME"
+          curl --fail --retry 5 --retry-delay 5 "$site_url/"
+          puzzle=$(curl --fail --retry 5 --retry-delay 5 "$site_url/api/puzzles/current?mode=daily")
+          puzzle_id=$(jq -r '.puzzle.id' <<< "$puzzle")
+          puzzle_pool=$(jq -r '.puzzle.pool' <<< "$puzzle")
+          curl --fail --retry 5 --retry-delay 5 \
+            -H "Origin: $site_url" \
+            -H 'Content-Type: application/json' \
+            --data "{\"puzzleId\":\"$puzzle_id\",\"pool\":\"$puzzle_pool\",\"guess\":\"__production_smoke_test__\"}" \
+            "$site_url/api/guess"
