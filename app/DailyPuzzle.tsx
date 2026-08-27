@@ -449,6 +449,7 @@ export function DailyPuzzle({
     <main className="game-shell">
       <header className="topbar">
         <button className="brand brand-button" type="button" onClick={() => switchMode("daily")} aria-label="Emojizzle home">
+          <KnowingMark size={36} className="header-brand-mark" />
           <BrandWordmark />
         </button>
         <div className="topbar-actions">
