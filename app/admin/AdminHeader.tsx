@@ -2,7 +2,7 @@
 
 export function AdminHeader({ title }: { title: string }) {
   async function logout() {
-    await fetch("/api/admin/session", { method: "DELETE" });
+    await fetch("/api/manage/session", { method: "DELETE" });
     window.location.replace("/admin/");
   }
 

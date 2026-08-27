@@ -12,7 +12,7 @@ export function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
     event.preventDefault();
     setBusy(true);
     setError("");
-    const response = await fetch("/api/admin/session", {
+    const response = await fetch("/api/manage/session", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ password }),

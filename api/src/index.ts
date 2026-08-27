@@ -147,7 +147,7 @@ app.http("guess", { methods: ["POST"], authLevel: "anonymous", route: "guess", h
 app.http("hint", { methods: ["POST"], authLevel: "anonymous", route: "hint", handler: handle(hint) });
 app.http("reveal", { methods: ["POST"], authLevel: "anonymous", route: "reveal", handler: handle(reveal) });
 app.http("feedback", { methods: ["POST"], authLevel: "anonymous", route: "feedback", handler: handle(feedback) });
-app.http("adminSession", { methods: ["POST", "DELETE"], authLevel: "anonymous", route: "admin/session", handler: handle(session) });
-app.http("adminPuzzles", { methods: ["GET", "POST"], authLevel: "anonymous", route: "admin/puzzles", handler: handle(adminPuzzles) });
-app.http("adminPuzzle", { methods: ["GET", "PATCH", "DELETE"], authLevel: "anonymous", route: "admin/puzzles/{id}", handler: handle(adminPuzzle) });
-app.http("adminFeedback", { methods: ["GET"], authLevel: "anonymous", route: "admin/feedback", handler: handle(adminFeedback) });
+app.http("adminSession", { methods: ["POST", "DELETE"], authLevel: "anonymous", route: "manage/session", handler: handle(session) });
+app.http("adminPuzzles", { methods: ["GET", "POST"], authLevel: "anonymous", route: "manage/puzzles", handler: handle(adminPuzzles) });
+app.http("adminPuzzle", { methods: ["GET", "PATCH", "DELETE"], authLevel: "anonymous", route: "manage/puzzles/{id}", handler: handle(adminPuzzle) });
+app.http("adminFeedback", { methods: ["GET"], authLevel: "anonymous", route: "manage/feedback", handler: handle(adminFeedback) });

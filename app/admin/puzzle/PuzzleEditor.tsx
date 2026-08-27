@@ -22,7 +22,7 @@ export function PuzzleEditor() {
   const load = useCallback(async () => {
     if (id === null) return;
     if (!id) { setPuzzle(blank); setAuth("signed-in"); return; }
-    const response = await fetch(`/api/admin/puzzles/${encodeURIComponent(id)}`, { cache: "no-store" });
+    const response = await fetch(`/api/manage/puzzles/${encodeURIComponent(id)}`, { cache: "no-store" });
     if (response.status === 401) { setAuth("signed-out"); return; }
     if (!response.ok) { setError("This puzzle could not be loaded."); setAuth("signed-in"); return; }
     const loaded = await response.json() as AdminPuzzle;
@@ -53,7 +53,7 @@ export function PuzzleEditor() {
     if (!requestedStatus && id && puzzle.status === "published" && !window.confirm("Save these changes to the live puzzle?")) return;
     if (id && puzzle.pool === "daily" && loadedPosition > 0 && next.position !== loadedPosition && !window.confirm("Change this puzzle’s position in the Daily rotation?")) return;
     setBusy(true); setError(""); setNotice("");
-    const response = await fetch(id ? `/api/admin/puzzles/${encodeURIComponent(id)}` : "/api/admin/puzzles", {
+    const response = await fetch(id ? `/api/manage/puzzles/${encodeURIComponent(id)}` : "/api/manage/puzzles", {
       method: id ? "PATCH" : "POST",
       headers: { "content-type": "application/json", ...(id && puzzle.etag ? { "if-match": puzzle.etag } : {}) },
       body: JSON.stringify(next),
@@ -68,7 +68,7 @@ export function PuzzleEditor() {
   async function archive() {
     if (!id || !window.confirm("Archive this puzzle? It will leave the playable catalog.")) return;
     setBusy(true);
-    const response = await fetch(`/api/admin/puzzles/${encodeURIComponent(id)}`, { method: "DELETE", headers: { "if-match": puzzle.etag } });
+    const response = await fetch(`/api/manage/puzzles/${encodeURIComponent(id)}`, { method: "DELETE", headers: { "if-match": puzzle.etag } });
     setBusy(false);
     if (!response.ok) { setError("The puzzle could not be archived."); return; }
     setPuzzle(await response.json() as AdminPuzzle); setDirty(false); setNotice("Archived");

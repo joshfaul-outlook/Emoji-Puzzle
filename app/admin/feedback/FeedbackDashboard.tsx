@@ -12,7 +12,7 @@ export function FeedbackDashboard() {
   const [rating, setRating] = useState("all");
   const [error, setError] = useState("");
   const load = useCallback(async () => {
-    const response = await fetch("/api/admin/feedback?limit=250", { cache: "no-store" });
+    const response = await fetch("/api/manage/feedback?limit=250", { cache: "no-store" });
     if (response.status === 401) { setAuth("signed-out"); return; }
     if (!response.ok) { setError("Feedback could not be loaded."); setAuth("signed-in"); return; }
     setItems((await response.json() as { feedback: FeedbackItem[] }).feedback); setAuth("signed-in");

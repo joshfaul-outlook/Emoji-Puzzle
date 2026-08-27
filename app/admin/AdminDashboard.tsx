@@ -15,7 +15,7 @@ export function AdminDashboard() {
 
   const load = useCallback(async () => {
     setError("");
-    const response = await fetch("/api/admin/puzzles", { cache: "no-store" });
+    const response = await fetch("/api/manage/puzzles", { cache: "no-store" });
     if (response.status === 401) { setAuth("signed-out"); return; }
     if (!response.ok) { setError("Puzzles could not be loaded."); setAuth("signed-in"); return; }
     const data = await response.json() as { puzzles: AdminPuzzle[] };
