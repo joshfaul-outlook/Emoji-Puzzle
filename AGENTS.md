@@ -1,4 +1,4 @@
-# Agent Guide
+# Emojizzle Agent Guide
 
 ## Mission
 

@@ -1,4 +1,4 @@
-# Product and Operations Plan
+# Emojizzle Product and Operations Plan
 
 ## Current baseline
 

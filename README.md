@@ -1,6 +1,8 @@
-# Emoji Daily
+# Emojizzle
 
 One globally shared emoji puzzle per UTC day, plus a separate Practice sequence and a private mobile-first puzzle administration portal.
+
+Looks obvious. Eventually. · https://emojizzle.com
 
 ## Architecture
 

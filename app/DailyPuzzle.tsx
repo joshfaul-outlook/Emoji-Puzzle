@@ -21,6 +21,8 @@ import {
   type Resolution,
 } from "../lib/play-state";
 import { feedbackPlayFields } from "../lib/feedback-payload";
+import { BrandWordmark } from "./components/BrandWordmark";
+import { KnowingMark } from "./components/KnowingMark";
 
 const SESSION_KEY = "emoji-daily-anonymous-session";
 
@@ -320,19 +322,19 @@ export function DailyPuzzle({
   function shareText() {
     if (puzzle.pool === "practice") {
       if (play.outcome === "playing") {
-        return "Can you solve this Emoji Daily practice puzzle?";
+        return "Can you solve this Emojizzle practice puzzle?";
       }
       const result = `${play.guessCount} ${play.guessCount === 1 ? "guess" : "guesses"} and ${play.hints.length} ${play.hints.length === 1 ? "hint" : "hints"}`;
       return play.outcome === "solved"
-        ? `I solved an Emoji Daily practice puzzle in ${result}. Can you beat my result?`
-        : `I revealed an Emoji Daily practice puzzle after ${result}. Can you solve it?`;
+        ? `I solved an Emojizzle practice puzzle in ${result}. Can you beat my result?`
+        : `I revealed an Emojizzle practice puzzle after ${result}. Can you solve it?`;
     }
     if (play.outcome === "playing") {
-      return "Can you decode today’s Emoji Daily?";
+      return "Can you decode today’s Emojizzle?";
     }
     const solved = play.outcome === "solved";
     return [
-      `Emoji Daily #${puzzle.dateCode}`,
+      `Emojizzle #${puzzle.dateCode}`,
       `${solved ? "🟩 Solved" : "⬜ Revealed"} · ${play.guessCount} ${play.guessCount === 1 ? "guess" : "guesses"} · ${play.hints.length} ${play.hints.length === 1 ? "hint" : "hints"}`,
       "Can you decode today’s puzzle?",
     ].join("\n");
@@ -349,8 +351,8 @@ export function DailyPuzzle({
     try {
       await navigator.share({
         title: puzzle.pool === "practice"
-          ? "Emoji Daily Practice"
-          : `Emoji Daily #${puzzle.dateCode}`,
+          ? "Emojizzle Practice"
+          : `Emojizzle #${puzzle.dateCode}`,
         text: shareText(),
         url: shareUrl(),
       });
@@ -390,8 +392,8 @@ export function DailyPuzzle({
   function shareByEmail() {
     const subject = encodeURIComponent(
       puzzle.pool === "practice"
-        ? "Try Emoji Daily Practice"
-        : `Try Emoji Daily #${puzzle.dateCode}`,
+        ? "Try Emojizzle Practice"
+        : `Try Emojizzle #${puzzle.dateCode}`,
     );
     const body = encodeURIComponent(`${shareText()}\n\n${shareUrl()}`);
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
@@ -446,12 +448,11 @@ export function DailyPuzzle({
   return (
     <main className="game-shell">
       <header className="topbar">
-        <button className="brand brand-button" type="button" onClick={() => switchMode("daily")} aria-label="Emoji Daily home">
-          <span className="brand-mark" aria-hidden="true">◒</span>
-          <span>Emoji Daily</span>
+        <button className="brand brand-button" type="button" onClick={() => switchMode("daily")} aria-label="Emojizzle home">
+          <BrandWordmark />
         </button>
         <div className="topbar-actions">
-          <button className="topbar-share" type="button" onClick={openShareSheet} aria-label="Share Emoji Daily">
+          <button className="topbar-share" type="button" onClick={openShareSheet} aria-label="Share Emojizzle">
             <span aria-hidden="true">↗</span>
             <span>Share</span>
           </button>
@@ -573,7 +574,7 @@ export function DailyPuzzle({
           <div className="confetti" aria-hidden="true">
             <i /><i /><i /><i /><i /><i />
           </div>
-          <div className="result-kicker">{play.outcome === "solved" ? "Aha—you got it!" : "Here’s the answer"}</div>
+          <div className="result-kicker"><KnowingMark size={44} />{play.outcome === "solved" ? "Aha—you got it!" : "Here’s the answer"}</div>
           <div className="result-emoji" aria-hidden="true">{puzzle.emoji}</div>
           <div className="category-pill">{play.resolution?.category}</div>
           <h1 id="result-title">{play.resolution?.answer}</h1>
@@ -688,7 +689,7 @@ export function DailyPuzzle({
               )}
             </div>
             <p className="share-status" aria-live="polite">
-              {shareState === "copied" && "Daily puzzle link copied!"}
+              {shareState === "copied" && "Emojizzle link copied!"}
               {shareState === "shared" && "Thanks for sharing!"}
               {shareState === "error" && "Couldn’t share this time. Please try again."}
             </p>
@@ -697,7 +698,7 @@ export function DailyPuzzle({
       )}
 
       <footer>
-        <span>{puzzle.pool === "practice" ? "Practice at your own pace." : "One puzzle. Every day. Everyone."}</span>
+        <span>Looks obvious. Eventually.</span>
         <span aria-hidden="true">No account · No feed · Just the puzzle</span>
       </footer>
     </main>

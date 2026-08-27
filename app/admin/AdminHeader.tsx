@@ -8,7 +8,7 @@ export function AdminHeader({ title }: { title: string }) {
 
   return (
     <header className="admin-header">
-      <a className="brand" href="/admin/"><span className="brand-mark" aria-hidden="true">◒</span><span>Emoji Daily</span></a>
+      <a className="brand" href="/admin/">emojizzle</a>
       <span className="admin-header-title">{title}</span>
       <button className="quiet-button" type="button" onClick={logout}>Log out</button>
     </header>

@@ -1,10 +1,10 @@
-# Emoji Daily: Product Goals
+# Emojizzle: Product Goals
 
 ## Vision
 
 Create a tiny global ritual: everyone receives the same sequence of emojis, tries to understand what it means, shares a spoiler-free result, and comes back tomorrow.
 
-Emoji Daily is not “guess the movie from emojis.” It is a daily visual-semantic riddle whose answer may be a phrase, person, story, song, event, place, joke, or concept.
+Emojizzle is not “guess the movie from emojis.” It is a daily visual-semantic riddle whose answer may be a phrase, person, story, song, event, place, joke, or concept.
 
 ## Core hypothesis
 

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024" viewBox="0 0 1536 1024">
+  <rect width="1536" height="1024" fill="#f5f4ef"/>
+  <circle cx="1420" cy="120" r="270" fill="#e3efed"/>
+  <rect x="180" y="178" width="164" height="164" rx="41" fill="#556b80"/>
+  <g fill="none" stroke="#f5f4ef" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"><path d="M220 235c25-19 53-22 78-8M286 227c25-14 53-11 78 8M241 275c18-13 39-12 55 1M301 276c18-13 39-12 55 1M264 312c20 15 42 14 61-2"/></g>
+  <text x="180" y="500" fill="#2f3437" font-family="Arial, sans-serif" font-size="112" font-weight="900" letter-spacing="-6">emojizzle</text>
+  <text x="186" y="625" fill="#2f3437" font-family="Georgia, serif" font-size="72" font-weight="600">Looks obvious.</text>
+  <text x="186" y="710" fill="#556b80" font-family="Georgia, serif" font-size="72" font-weight="600">Eventually.</text>
+  <path d="M1180 790l15 36 36 15-36 15-15 36-15-36-36-15 36-15z" fill="#d6b46a"/>
+  <text x="186" y="858" fill="#697075" font-family="Arial, sans-serif" font-size="30" letter-spacing="2">A DAILY EMOJI PUZZLE</text>
+</svg>

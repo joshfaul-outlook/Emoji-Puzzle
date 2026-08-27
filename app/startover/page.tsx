@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { KnowingMark } from "../components/KnowingMark";
 
 export default function StartOver() {
   useEffect(() => {
@@ -19,7 +20,7 @@ export default function StartOver() {
 
   return (
     <main className="utility-page">
-      <div className="brand-mark" aria-hidden="true">◒</div>
+      <KnowingMark size={64} />
       <h1>Starting fresh…</h1>
       <p aria-live="polite">Clearing this device’s game progress and returning to today’s puzzle.</p>
     </main>

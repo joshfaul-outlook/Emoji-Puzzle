@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { DailyPuzzle, type ChallengeBenchmark } from "./DailyPuzzle";
 import type { PublicPuzzle } from "../lib/public-puzzle";
+import { KnowingMark } from "./components/KnowingMark";
 
 type LoaderMode = "daily" | "practice" | "next";
 
@@ -25,7 +26,7 @@ export function GameLoader({ mode }: { mode: LoaderMode }) {
   if (error) {
     return (
       <main className="utility-page">
-        <div className="brand-mark" aria-hidden="true">◒</div>
+        <KnowingMark size={64} />
         <h1>Puzzle temporarily unavailable</h1>
         <p>{error}</p>
         <button className="primary-button" type="button" onClick={() => window.location.reload()}>Try again</button>
@@ -36,7 +37,7 @@ export function GameLoader({ mode }: { mode: LoaderMode }) {
   if (!result) {
     return (
       <main className="utility-page" aria-busy="true">
-        <div className="brand-mark" aria-hidden="true">◒</div>
+        <KnowingMark size={64} />
         <h1>Setting today’s puzzle…</h1>
         <p aria-live="polite">Just a moment.</p>
       </main>

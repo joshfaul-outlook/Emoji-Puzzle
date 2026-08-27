@@ -2,19 +2,24 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://proud-cliff-05850990f.7.azurestaticapps.net"),
-    title: "Emoji Daily — One puzzle for everyone",
-    description: "Decode today’s globally shared emoji puzzle. One puzzle, once a day, no account needed.",
+    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://emojizzle.com"),
+    title: "Emojizzle — Looks obvious. Eventually.",
+    description: "Decode today's shared emoji puzzle. One puzzle, every day, no account needed.",
+    alternates: { canonical: "https://emojizzle.com/" },
+    icons: {
+      icon: "/brand/favicon.svg",
+      apple: "/brand/apple-touch-icon.png",
+    },
     openGraph: {
-      title: "Emoji Daily",
-      description: "One emoji puzzle. Every day. Everyone.",
+      title: "Emojizzle",
+      description: "Looks obvious. Eventually.",
       type: "website",
-      images: [{ url: "/og.png", width: 1536, height: 1024, alt: "Emoji Daily — one puzzle every day" }],
+      images: [{ url: "/og.png", width: 1536, height: 1024, alt: "Emojizzle — Looks obvious. Eventually." }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "Emoji Daily",
-      description: "One emoji puzzle. Every day. Everyone.",
+      title: "Emojizzle",
+      description: "Looks obvious. Eventually.",
       images: ["/og.png"],
     },
 };
@@ -23,7 +28,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#f7f2e9",
+  themeColor: "#F5F4EF",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

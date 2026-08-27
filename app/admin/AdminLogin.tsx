@@ -29,7 +29,7 @@ export function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
   return (
     <main className="admin-login-shell">
       <form className="admin-login-card" onSubmit={submit}>
-        <Link className="brand" href="/"><span className="brand-mark" aria-hidden="true">◒</span><span>Emoji Daily</span></Link>
+        <Link className="brand" href="/">emojizzle</Link>
         <p className="admin-eyebrow">Puzzle administration</p>
         <h1>Welcome back</h1>
         <p>Enter the private admin password to manage puzzles and feedback.</p>

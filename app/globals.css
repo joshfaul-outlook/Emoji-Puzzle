@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
 :root {
+  --font-ui: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-brand: "Nunito Sans", ui-rounded, "Arial Rounded MT Bold", Arial, sans-serif;
+  --font-editorial: Fraunces, Georgia, "Times New Roman", serif;
   --ink: #18253a;
   --muted: #687183;
   --paper: #f7f2e9;
@@ -660,4 +663,76 @@ footer span:first-child { color: var(--ink); font-family: Georgia, serif; font-s
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+
+/* Emojizzle brand foundation */
+:root {
+  --brand-slate: #556b80;
+  --brand-mist: #89b6b0;
+  --brand-gold: #d6b46a;
+  --brand-ivory: #f5f4ef;
+  --brand-graphite: #2f3437;
+  --surface: #fffdfa;
+  --surface-muted: #eceae5;
+  --line-strong: #c7c7c1;
+  --text-primary: #2f3437;
+  --text-muted: #697075;
+  --text-faint: #888d90;
+  --slate-dark: #405365;
+  --slate-soft: #e6ebee;
+  --mist-soft: #e3efed;
+  --gold-soft: #f4ebd8;
+  --danger: #a45652;
+  --danger-soft: #f4e8e6;
+  --ink: var(--brand-graphite);
+  --muted: var(--text-muted);
+  --paper: var(--brand-ivory);
+  --card: var(--surface);
+  --line: #d9d8d3;
+  --shadow: 0 10px 30px rgba(47, 52, 55, .055);
+}
+
+html { background: var(--brand-ivory); }
+body { color: var(--brand-graphite); background: radial-gradient(circle at 90% 10%, rgba(137,182,176,.1), transparent 26rem), var(--brand-ivory); font-family: var(--font-ui), Inter, sans-serif; }
+:focus-visible { outline-color: rgba(85,107,128,.28); }
+.brand { color: var(--brand-graphite); font-family: var(--font-brand), sans-serif; font-size: 24px; font-weight: 900; letter-spacing: -.055em; line-height: .95; }
+.brand-wordmark { display: inline-block; }
+.knowing-mark { --mark-feature: var(--brand-ivory); display: block; color: var(--brand-slate); flex: 0 0 auto; }
+.knowing-mark--inverse { --mark-feature: var(--brand-slate); color: var(--brand-ivory); }
+.brand-mark { display: none; }
+.topbar { border-bottom-color: var(--line); }
+.topbar-share { color: var(--brand-slate); }
+.day-pill, .category-pill { border-color: var(--line); color: var(--brand-slate); background: rgba(255,255,255,.55); }
+.mode-switch { border-color: var(--line); background: rgba(255,255,255,.55); }
+.mode-switch button.selected { color: var(--brand-ivory); background: var(--brand-slate); box-shadow: none; }
+.play-card, .result-card { border-color: var(--line); border-radius: 24px; background: rgba(255,253,250,.9); box-shadow: var(--shadow); }
+.eyebrow, .result-kicker { color: var(--brand-slate); }
+h1, .share-heading h2 { font-family: var(--font-editorial), Georgia, serif; font-weight: 600; }
+.emoji-stage { border-color: var(--line); border-radius: 20px; background: var(--surface); }
+.emoji-stage::before, .emoji-stage::after, .emoji-glow { display: none; }
+.emoji-line { filter: none; }
+.guess-form input { border-color: var(--line-strong); color: var(--brand-graphite); background: var(--surface); }
+.guess-form input:focus { border-color: var(--brand-slate); box-shadow: 0 0 0 3px rgba(85,107,128,.13); }
+.primary-button, .share-button { background: var(--brand-slate); box-shadow: none; }
+.primary-button:hover, .share-button:hover { background: var(--slate-dark); transform: none; }
+.primary-button:active, .share-button:active { transform: translateY(1px); box-shadow: none; }
+.wrong-message, .feedback-error { color: var(--danger); }
+.hint { background: var(--gold-soft); }
+.hint span { color: var(--brand-graphite); background: var(--brand-gold); }
+.hint-button > span { color: var(--gold-dark, #ac8950); }
+.result-kicker { display: flex; align-items: center; justify-content: center; gap: 9px; }
+.result-card.solved .result-kicker { color: var(--gold-dark, #ac8950); }
+.result-card.revealed .result-kicker { color: var(--brand-slate); }
+.next-button { color: var(--brand-ivory); background: var(--brand-slate); border: 0; box-shadow: none; }
+.next-button:hover { background: var(--slate-dark); }
+.feedback-card { border-color: var(--line); background: var(--mist-soft); }
+.rating-buttons button.selected { border-color: var(--brand-slate); background: var(--mist-soft); box-shadow: 0 0 0 2px white, 0 0 0 4px var(--brand-slate); }
+.feedback-thanks > span { background: var(--mist-soft); color: var(--mist-dark, #648f89); }
+footer span:first-child { color: var(--brand-graphite); font-family: var(--font-editorial), Georgia, serif; }
+.share-sheet { border-color: var(--line); }
+.share-options button:hover { border-color: var(--brand-slate); background: var(--slate-soft); }
+
+@media (max-width: 680px) {
+  .brand { font-size: 21px; }
+  .play-card, .result-card { margin-top: 28px; }
 }

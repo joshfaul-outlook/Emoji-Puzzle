@@ -1,0 +1,103 @@
+name: Deploy Emojizzle
+
+on:
+  push:
+    branches: [deploy]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: emojizzle-production
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: 22.13.0
+  APP_NAME: emoji-daily-prod
+  RESOURCE_GROUP: emoji-daily-prod-rg
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install web dependencies
+        run: npm ci
+      - name: Install API dependencies
+        working-directory: api
+        run: npm ci
+      - name: Lint web app
+        run: npm run lint
+      - name: Test web app
+        run: npm test
+      - name: Test API
+        run: npm run api:test
+      - name: Build API
+        run: npm run api:build
+      - name: Build static web app
+        env:
+          NEXT_PUBLIC_SITE_URL: https://emojizzle.com
+        run: npm run build
+      - name: Store static build
+        uses: actions/upload-artifact@v4
+        with:
+          name: emojizzle-static-build
+          path: out
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy production
+    needs: validate
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://emojizzle.com
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Restore static build
+        uses: actions/download-artifact@v4
+        with:
+          name: emojizzle-static-build
+          path: out
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Get Static Web Apps deployment token
+        id: static-web-app
+        shell: bash
+        run: |
+          token="$(az staticwebapp secrets list \
+            --name "$APP_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query properties.apiKey \
+            --output tsv)"
+          if [[ -z "$token" ]]; then
+            echo "Static Web Apps deployment token was not returned." >&2
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+      - name: Deploy web app and API
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.static-web-app.outputs.token }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: out
+          output_location: ""
+          api_location: api
+          skip_app_build: true
