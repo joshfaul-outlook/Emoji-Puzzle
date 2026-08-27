@@ -3,6 +3,7 @@ import { adminConfigured, clearSessionCookie, createSessionCookie, passwordAccep
 import { body, json, requireAdmin, requireOrigin } from "./http.js";
 import { isAcceptedGuess, validatePuzzle, type PuzzlePool, type PuzzleStatus, type StoredPuzzle } from "./model.js";
 import { createPuzzle, getPuzzle, insertFeedback, listFeedback, listPuzzles, updatePuzzle } from "./storage.js";
+import { suggestPuzzle } from "./suggestions.js";
 
 const launchDate = Date.parse("2026-08-05T00:00:00Z");
 
@@ -135,6 +136,14 @@ async function adminFeedback(request: HttpRequest) {
   return json({ feedback: await listFeedback(limit) });
 }
 
+async function adminPuzzleSuggestions(request: HttpRequest) {
+  const unauthorized = requireAdmin(request); if (unauthorized) return unauthorized;
+  const denied = requireOrigin(request); if (denied) return denied;
+  const payload = await body<{ answer?: string }>(request); const answer = payload?.answer?.trim() ?? "";
+  if (!answer || answer.length > 120) return json({ error: "Enter an answer up to 120 characters." }, 400);
+  try { return json(await suggestPuzzle(answer)); } catch (error) { const status = (error as { statusCode?: number }).statusCode ?? 502; return json({ error: (error as Error).message || "AI help is unavailable." }, status); }
+}
+
 function handle(handler: (request: HttpRequest, context: InvocationContext) => Promise<HttpResponseInit>) {
   return async (request: HttpRequest, context: InvocationContext) => {
     try { return await handler(request, context); }
@@ -151,3 +160,4 @@ app.http("adminSession", { methods: ["POST", "DELETE"], authLevel: "anonymous", 
 app.http("adminPuzzles", { methods: ["GET", "POST"], authLevel: "anonymous", route: "manage/puzzles", handler: handle(adminPuzzles) });
 app.http("adminPuzzle", { methods: ["GET", "PATCH", "DELETE"], authLevel: "anonymous", route: "manage/puzzles/{id}", handler: handle(adminPuzzle) });
 app.http("adminFeedback", { methods: ["GET"], authLevel: "anonymous", route: "manage/feedback", handler: handle(adminFeedback) });
+app.http("adminPuzzleSuggestions", { methods: ["POST"], authLevel: "anonymous", route: "manage/puzzle-suggestions", handler: handle(adminPuzzleSuggestions) });

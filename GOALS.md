@@ -12,7 +12,7 @@ The product works if we can repeatedly author puzzles that are:
 
 - intriguing before the answer;
 - fair enough to keep trying;
-- flexible enough to support multiple clue structures;
+- flexible enough to support varied clue styles;
 - satisfying and inevitable after the reveal.
 
 The MVP exists to test that hypothesis, not to prove a complete business model.
@@ -20,7 +20,7 @@ The MVP exists to test that hypothesis, not to prove a complete business model.
 ## MVP goals
 
 1. Make the complete daily loop understandable without instructions or an account.
-2. Learn which puzzle structures create the strongest “aha” and which create ambiguity.
+2. Learn which clue styles create the strongest “aha” and which create ambiguity.
 3. Learn how players use guesses, hints, and reveal when they get stuck.
 4. Make sharing feel natural without leaking the puzzle.
 5. Create a lightweight, repeatable feedback loop for puzzle quality.
@@ -49,7 +49,7 @@ We are looking for directional evidence, not a composite score:
 - Players understand what to do within seconds.
 - Most puzzles produce a meaningful solve or reveal rather than abandonment.
 - Players can explain why the answer fits after seeing it.
-- Hint usage reveals useful difficulty differences between puzzle structures.
+- Hint usage reveals useful difficulty differences between clue styles.
 - Written feedback identifies actionable ambiguity, delight, or unfairness.
 - Some players share or return without being prompted by accounts or rewards.
 - The team can revise a puzzle or mechanic and publish it quickly.

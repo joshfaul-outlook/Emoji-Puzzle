@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { TableClient, TableTransaction, type TableEntity } from "@azure/data-tables";
 import type { PuzzlePool, PuzzleStatus, PuzzleStructure, StoredPuzzle } from "./model.js";
+import { deriveCatalogOrder, moveInCatalog, normalizeCatalogOrder, positionsForOrder, type CatalogOrder } from "./ordering.js";
 
 const puzzleTableName = "PuzzleCatalog";
 const feedbackTableName = "PuzzleFeedback";
+const orderRowKey = "__catalog_order__";
 
 function connectionString() {
   const value = process.env.TABLE_STORAGE_CONNECTION_STRING;
@@ -24,22 +26,53 @@ export function fromPuzzleEntity(entity: PuzzleEntity): StoredPuzzle {
   return { id: entity.rowKey, number: entity.number, pool: entity.pool as PuzzlePool, position: entity.position, status: entity.status as PuzzleStatus, emoji: entity.emoji, answer: entity.answer, acceptedAnswers: JSON.parse(entity.acceptedAnswersJson) as string[], category: entity.category, structure: entity.structure as PuzzleStructure, hints: JSON.parse(entity.hintsJson) as string[], explanation: entity.explanation, createdAt: entity.createdAt, updatedAt: entity.updatedAt, etag: String(entity.etag ?? "") };
 }
 
+type CatalogOrderEntity = TableEntity & { dailyIdsJson: string; practiceIdsJson: string; updatedAt: string };
+
+async function rawPuzzles() {
+  const client = puzzleTable(); const puzzles: StoredPuzzle[] = [];
+  for await (const entity of client.listEntities<PuzzleEntity>({ queryOptions: { filter: `PartitionKey eq 'Puzzle' and RowKey ne '${orderRowKey}'` } })) puzzles.push(fromPuzzleEntity(entity));
+  return puzzles;
+}
+
+async function getOrderEntity() {
+  try { return await puzzleTable().getEntity<CatalogOrderEntity>("Puzzle", orderRowKey); }
+  catch (error) { if ((error as { statusCode?: number }).statusCode === 404) return null; throw error; }
+}
+
+function readOrder(entity: CatalogOrderEntity): CatalogOrder { return { daily: JSON.parse(entity.dailyIdsJson) as string[], practice: JSON.parse(entity.practiceIdsJson) as string[] }; }
+function orderEntity(order: CatalogOrder, updatedAt: string): CatalogOrderEntity { return { partitionKey: "Puzzle", rowKey: orderRowKey, dailyIdsJson: JSON.stringify(order.daily), practiceIdsJson: JSON.stringify(order.practice), updatedAt }; }
+
+async function orderSnapshot(puzzles: StoredPuzzle[], createIfMissing = false) {
+  const existing = await getOrderEntity();
+  if (existing) return { entity: existing, order: normalizeCatalogOrder(readOrder(existing), puzzles) };
+  const order = deriveCatalogOrder(puzzles);
+  if (createIfMissing) {
+    try { await puzzleTable().createEntity(orderEntity(order, new Date().toISOString())); }
+    catch (error) { if ((error as { statusCode?: number }).statusCode !== 409) throw error; }
+    const entity = await getOrderEntity();
+    if (entity) return { entity, order: normalizeCatalogOrder(readOrder(entity), puzzles) };
+  }
+  return { entity: null, order };
+}
+
 export function toPuzzleEntity(puzzle: Omit<StoredPuzzle, "etag">): PuzzleEntity {
   return { partitionKey: "Puzzle", rowKey: puzzle.id, number: puzzle.number, pool: puzzle.pool, position: puzzle.position, status: puzzle.status, emoji: puzzle.emoji, answer: puzzle.answer, acceptedAnswersJson: JSON.stringify(puzzle.acceptedAnswers), category: puzzle.category, structure: puzzle.structure, hintsJson: JSON.stringify(puzzle.hints), explanation: puzzle.explanation, createdAt: puzzle.createdAt, updatedAt: puzzle.updatedAt };
 }
 
 export async function listPuzzles(options: { status?: PuzzleStatus; pool?: PuzzlePool } = {}) {
-  const client = puzzleTable();
-  const puzzles: StoredPuzzle[] = [];
-  for await (const entity of client.listEntities<PuzzleEntity>({ queryOptions: { filter: `PartitionKey eq 'Puzzle'` } })) {
-    const puzzle = fromPuzzleEntity(entity);
-    if ((!options.status || puzzle.status === options.status) && (!options.pool || puzzle.pool === options.pool)) puzzles.push(puzzle);
-  }
-  return puzzles.sort((a, b) => a.number - b.number);
+  const puzzles = await rawPuzzles();
+  const { order } = await orderSnapshot(puzzles);
+  const positions = positionsForOrder(order);
+  return puzzles.map((p) => ({ ...p, position: positions.get(p.id) ?? p.position })).filter((p) => (!options.status || p.status === options.status) && (!options.pool || p.pool === options.pool)).sort((a, b) => a.pool.localeCompare(b.pool) || a.position - b.position || a.number - b.number);
 }
 
 export async function getPuzzle(id: string) {
-  try { return fromPuzzleEntity(await puzzleTable().getEntity<PuzzleEntity>("Puzzle", id)); }
+  try {
+    const puzzle = fromPuzzleEntity(await puzzleTable().getEntity<PuzzleEntity>("Puzzle", id));
+    const entity = await getOrderEntity();
+    if (entity) { const position = positionsForOrder(readOrder(entity)).get(id); if (position) return { ...puzzle, position }; }
+    return puzzle;
+  }
   catch (error) { if ((error as { statusCode?: number }).statusCode === 404) return null; throw error; }
 }
 
@@ -63,34 +96,27 @@ async function reserveNumber() {
 export async function createPuzzle(input: Partial<StoredPuzzle>) {
   const now = new Date().toISOString();
   const pool = input.pool === "daily" ? "daily" : "practice";
-  const siblings = await listPuzzles({ pool });
+  const siblings = await rawPuzzles();
   const number = await reserveNumber();
   const idBase = (input.answer ?? "puzzle").normalize("NFKD").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50) || "puzzle";
-  const puzzle: Omit<StoredPuzzle, "etag"> = { id: `${idBase}-${randomUUID().slice(0, 8)}`, number, pool, position: siblings.reduce((max, item) => Math.max(max, item.position), 0) + 1, status: input.status ?? "draft", emoji: input.emoji?.trim() ?? "", answer: input.answer?.trim() ?? "", acceptedAnswers: input.acceptedAnswers ?? [], category: input.category?.trim() ?? "", structure: input.structure ?? "literal", hints: (input.hints ?? ["", "", ""]).slice(0, 3), explanation: input.explanation?.trim() ?? "", createdAt: now, updatedAt: now };
-  await puzzleTable().createEntity(toPuzzleEntity(puzzle));
+  const { entity, order } = await orderSnapshot(siblings, true);
+  const puzzle: Omit<StoredPuzzle, "etag"> = { id: `${idBase}-${randomUUID().slice(0, 8)}`, number, pool, position: 0, status: input.status ?? "draft", emoji: input.emoji?.trim() ?? "", answer: input.answer?.trim() ?? "", acceptedAnswers: input.acceptedAnswers ?? [], category: input.category?.trim() ?? "", structure: input.structure ?? "literal", hints: (input.hints ?? ["", "", ""]).slice(0, 3), explanation: input.explanation?.trim() ?? "", createdAt: now, updatedAt: now };
+  const nextOrder = moveInCatalog(order, puzzle.id, pool, input.position);
+  puzzle.position = positionsForOrder(nextOrder).get(puzzle.id) ?? 1;
+  if (entity) { const transaction = new TableTransaction(); transaction.createEntity(toPuzzleEntity(puzzle)); transaction.updateEntity(orderEntity(nextOrder, now), "Replace", { etag: entity.etag }); await puzzleTable().submitTransaction(transaction.actions); }
+  else await puzzleTable().createEntity(toPuzzleEntity(puzzle));
   return getPuzzle(puzzle.id);
 }
 
 export async function updatePuzzle(existing: StoredPuzzle, input: Partial<StoredPuzzle>, etag: string) {
   const now = new Date().toISOString();
   const pool = input.pool ?? existing.pool;
-  let position = input.position ?? existing.position;
-  if (pool !== existing.pool) {
-    const siblings = await listPuzzles({ pool });
-    position = siblings.reduce((max, item) => Math.max(max, item.position), 0) + 1;
-  }
-  const next: Omit<StoredPuzzle, "etag"> = { ...existing, ...input, id: existing.id, number: existing.number, pool, position, acceptedAnswers: input.acceptedAnswers ?? existing.acceptedAnswers, hints: (input.hints ?? existing.hints).slice(0, 3), createdAt: existing.createdAt, updatedAt: now };
-  if (pool === "daily" && pool === existing.pool && Number.isInteger(input.position) && input.position !== existing.position) {
-    const siblings = (await listPuzzles({ pool })).filter((puzzle) => puzzle.id !== existing.id).sort((a, b) => a.position - b.position);
-    const target = Math.max(0, Math.min(siblings.length, (input.position as number) - 1));
-    const ordered = [...siblings.slice(0, target), { ...next, etag }, ...siblings.slice(target)];
-    if (ordered.length > 100) throw new Error("Daily reordering supports up to 100 records");
-    const transaction = new TableTransaction();
-    ordered.forEach((puzzle, index) => transaction.updateEntity(toPuzzleEntity({ ...puzzle, position: index + 1, updatedAt: puzzle.id === existing.id ? now : puzzle.updatedAt }), "Replace", { etag: puzzle.etag }));
-    await puzzleTable().submitTransaction(transaction.actions);
-    return getPuzzle(existing.id);
-  }
-  await puzzleTable().updateEntity(toPuzzleEntity(next), "Replace", { etag });
+  const puzzles = await rawPuzzles(); const snapshot = await orderSnapshot(puzzles, true);
+  const nextOrder = (pool !== existing.pool || Number.isInteger(input.position)) ? moveInCatalog(snapshot.order, existing.id, pool, Number.isInteger(input.position) ? input.position : undefined) : snapshot.order;
+  const positions = positionsForOrder(nextOrder);
+  const next: Omit<StoredPuzzle, "etag"> = { ...existing, ...input, id: existing.id, number: existing.number, pool, position: positions.get(existing.id) ?? existing.position, acceptedAnswers: input.acceptedAnswers ?? existing.acceptedAnswers, hints: (input.hints ?? existing.hints).slice(0, 3), createdAt: existing.createdAt, updatedAt: now };
+  if (snapshot.entity && JSON.stringify(nextOrder) !== JSON.stringify(snapshot.order)) { const transaction = new TableTransaction(); transaction.updateEntity(toPuzzleEntity(next), "Replace", { etag }); transaction.updateEntity(orderEntity(nextOrder, now), "Replace", { etag: snapshot.entity.etag }); await puzzleTable().submitTransaction(transaction.actions); }
+  else await puzzleTable().updateEntity(toPuzzleEntity(next), "Replace", { etag });
   return getPuzzle(existing.id);
 }
 

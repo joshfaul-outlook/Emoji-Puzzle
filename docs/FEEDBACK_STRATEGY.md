@@ -9,7 +9,7 @@ The initial questions are:
 1. Was this puzzle satisfying?
 2. Was it fair or ambiguous?
 3. Did hints rescue the experience?
-4. Which structures create the best reveals?
+4. Which clue styles create the best reveals?
 5. Where does the interaction itself create friction?
 
 ## What is captured now

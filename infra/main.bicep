@@ -9,6 +9,8 @@ param appName string = 'emoji-daily-prod'
 param adminPassword string
 @secure()
 param adminSessionSecret string
+@secure()
+param openAiApiKey string = ''
 @description('Email that receives the $1 monthly budget alert.')
 param budgetEmail string
 @description('Production custom hostname. Set to an empty string only to use the generated Azure hostname.')
@@ -29,6 +31,7 @@ module production './resources.bicep' = {
     appName: appName
     adminPassword: adminPassword
     adminSessionSecret: adminSessionSecret
+    openAiApiKey: openAiApiKey
     customDomain: customDomain
   }
 }

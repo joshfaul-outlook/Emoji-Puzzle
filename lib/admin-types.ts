@@ -1,7 +1,6 @@
 import type { PuzzlePool } from "./public-puzzle";
 
 export type PuzzleStatus = "draft" | "published" | "archived";
-export type PuzzleStructure = "literal" | "idiom" | "rebus" | "person" | "story" | "movie" | "historical" | "interpretive";
 
 export type AdminPuzzle = {
   id: string;
@@ -13,7 +12,6 @@ export type AdminPuzzle = {
   answer: string;
   acceptedAnswers: string[];
   category: string;
-  structure: PuzzleStructure;
   hints: string[];
   explanation: string;
   createdAt: string;

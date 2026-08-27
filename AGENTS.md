@@ -42,7 +42,7 @@ Every puzzle must have:
 - explicit accepted variants after deterministic normalization;
 - three progressive hints, moving from category to interpretation to near-answer;
 - a short explanation that delivers the “aha”;
-- a declared structure used to keep the set varied.
+- varied clue styles across the set.
 
 Before shipping a puzzle, ask:
 

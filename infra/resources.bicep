@@ -5,6 +5,9 @@ param appName string
 param adminPassword string
 @secure()
 param adminSessionSecret string
+@secure()
+param openAiApiKey string = ''
+param openAiModel string = 'gpt-5.6-luna'
 param customDomain string = ''
 
 var uniqueSuffix = take(uniqueString(subscription().subscriptionId, resourceGroup().id, appName), 10)
@@ -59,6 +62,8 @@ resource appSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
     TABLE_STORAGE_CONNECTION_STRING: storageConnectionString
     ADMIN_PASSWORD: adminPassword
     ADMIN_SESSION_SECRET: adminSessionSecret
+    OPENAI_API_KEY: openAiApiKey
+    OPENAI_MODEL: openAiModel
     SITE_ORIGIN: empty(customDomain)
       ? 'https://${site.properties.defaultHostname}'
       : 'https://${customDomain}'

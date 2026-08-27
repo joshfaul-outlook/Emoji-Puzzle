@@ -42,8 +42,9 @@ jobs:
         env:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           ADMIN_SESSION_SECRET: ${{ secrets.ADMIN_SESSION_SECRET }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          az deployment group create --name emoji-daily-production --resource-group emoji-daily-prod-rg --template-file infra/resources.bicep --parameters location=eastus2 appName=emoji-daily-prod adminPassword="$ADMIN_PASSWORD" adminSessionSecret="$ADMIN_SESSION_SECRET" --output none
+          az deployment group create --name emoji-daily-production --resource-group emoji-daily-prod-rg --template-file infra/resources.bicep --parameters location=eastus2 appName=emoji-daily-prod adminPassword="$ADMIN_PASSWORD" adminSessionSecret="$ADMIN_SESSION_SECRET" openAiApiKey="$OPENAI_API_KEY" --output none
           site_name=$(az deployment group show --name emoji-daily-production --resource-group emoji-daily-prod-rg --query properties.outputs.staticWebAppName.value --output tsv)
           storage_name=$(az deployment group show --name emoji-daily-production --resource-group emoji-daily-prod-rg --query properties.outputs.storageAccountName.value --output tsv)
           deploy_token=$(az staticwebapp secrets list --name "$site_name" --resource-group emoji-daily-prod-rg --query properties.apiKey --output tsv)

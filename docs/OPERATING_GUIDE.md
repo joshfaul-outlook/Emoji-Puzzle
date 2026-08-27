@@ -14,7 +14,9 @@ The production workflow validates both apps, provisions the existing production 
 
 ## Puzzle operations
 
-Visit `/admin/`, enter the configured password, and use the catalog filters. New records begin as drafts. Publishing requires an emoji sequence, category, canonical accepted answer, three hints, and an explanation. Archive removes a record from gameplay without deleting it; Restore returns it to Draft. ETags prevent an older tab from overwriting a newer edit.
+Visit `/admin/`, enter the configured password, and use the catalog filters. Choose one pool with all statuses visible to drag puzzles by the handle; drops save immediately. Numeric pool positions are also available in the editor. New records begin as drafts. Publishing requires an emoji sequence, category, canonical accepted answer, three hints, and an explanation. Archive removes a record from gameplay without deleting it; Restore returns it to Draft. ETags prevent an older tab from overwriting a newer edit.
+
+The editor’s AI help uses `OPENAI_API_KEY` server-side and returns reviewable emoji, category, accepted-answer, hint, and explanation suggestions. It never saves or publishes automatically. `OPENAI_MODEL` defaults to `gpt-5.6-luna`.
 
 The emoji helper searches a bundled dataset locally. `Use suggested` replaces the current sequence, `Copy` copies the suggestion, `Undo` restores the previous sequence, and the emoji field always remains manually editable.
 

@@ -4,7 +4,7 @@
 
 Emoji Daily ships as a mobile-first static web app with a same-origin Azure API. It has one shared UTC Daily puzzle, a separate 330-puzzle Practice sequence, deterministic answer matching, three authored hints, explicit reveal, spoiler-free sharing, device-local play continuity, and anonymous feedback.
 
-Azure Table Storage is the production source of truth. The private `/admin/` portal supports searching, drafting, editing, publishing, archiving, restoring, emoji keyword search, phrase suggestions, and feedback review. The original 350 records remain an idempotent migration fixture.
+Azure Table Storage is the production source of truth. The private `/admin/` portal supports searching, drafting, editing, publishing, archiving, restoring, drag-and-drop pool ordering, emoji keyword search, AI phrase suggestions, and feedback review. The original 350 records remain an idempotent migration fixture.
 
 ## Product learning
 
@@ -24,4 +24,4 @@ Azure Table Storage is the production source of truth. The private `/admin/` por
 
 ## Deferred work
 
-Player accounts, roles, audit logs, bulk operations, hard deletion, AI suggestions, fuzzy judging, monetization, leaderboards, localization, and Standard-plan features remain out of scope until usage establishes a need.
+Player accounts, roles, audit logs, bulk operations, hard deletion, fuzzy judging, monetization, leaderboards, localization, and Standard-plan features remain out of scope until usage establishes a need.
