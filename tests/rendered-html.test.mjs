@@ -253,7 +253,7 @@ test("keeps answers server-side and includes the Azure interaction loop", async 
   assert.match(client, /Daily/);
   assert.match(client, /Practice/);
   assert.match(client, /Can you beat my result/);
-  assert.match(client, /\? "PRACTICE"/);
+  assert.match(client, /puzzle\.pool !== "practice"/);
   assert.doesNotMatch(client, /PRACTICE \$\{puzzle\.sequenceNumber\}/);
   assert.match(api, /anonymousSessionId/);
   assert.match(api, /pool === "practice" && comment !== null/);
