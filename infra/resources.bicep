@@ -59,7 +59,9 @@ resource appSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
     TABLE_STORAGE_CONNECTION_STRING: storageConnectionString
     ADMIN_PASSWORD: adminPassword
     ADMIN_SESSION_SECRET: adminSessionSecret
-    SITE_ORIGIN: 'https://${site.properties.defaultHostname}'
+    SITE_ORIGIN: empty(customDomain)
+      ? 'https://${site.properties.defaultHostname}'
+      : 'https://${customDomain}'
   }
 }
 
