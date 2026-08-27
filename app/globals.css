@@ -462,8 +462,8 @@ h1 {
 .challenge-comparison strong { font-size: 15px; }
 .challenge-comparison small { color: #626a77; font-size: 11px; }
 
-.share-button { min-width: 180px; padding: 0 27px; }
-.share-button svg { width: 20px; height: 20px; margin-right: 7px; vertical-align: -4px; }
+.share-button { min-width: 180px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 27px; }
+.share-button svg { width: 20px; height: 20px; flex: 0 0 auto; }
 .next-button {
   min-height: 54px;
   margin-left: 9px;
