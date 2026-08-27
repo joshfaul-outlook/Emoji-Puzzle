@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <mask id="mark-cutouts">
+    <rect width="512" height="512" fill="white"/>
+    <g fill="none" stroke="black" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M112 180 C142 151 184 147 216 165"/>
+      <path d="M296 166 C329 144 371 147 400 176"/>
+      <path d="M216 350 C252 359 292 347 328 315"/>
+    </g>
+    <g fill="none" stroke="black" stroke-width="20" stroke-linecap="round">
+      <path d="M110 241 H221"/>
+      <path d="M291 241 H405"/>
+    </g>
+    <path d="M143 242 H235 C234 276 214 299 187 299 C160 299 144 278 143 242 Z" fill="black"/>
+    <path d="M322 242 H410 C409 276 390 299 363 299 C336 299 323 278 322 242 Z" fill="black"/>
+  </mask>
+  <rect width="512" height="512" rx="128" fill="black" mask="url(#mark-cutouts)"/>
+</svg>

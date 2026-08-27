@@ -11,12 +11,18 @@ export const metadata: Metadata = {
     title: "Emojizzle — Looks obvious. Eventually.",
     description: "Decode today's shared emoji puzzle. One puzzle, every day, no account needed.",
     alternates: { canonical: "https://emojizzle.com/" },
+    manifest: "/site.webmanifest",
+    appleWebApp: {
+      capable: true,
+      title: "Emojizzle",
+      statusBarStyle: "default",
+    },
     icons: {
       icon: [
         { url: "/favicon.svg", type: "image/svg+xml" },
         { url: "/brand/icon-192.png", type: "image/png", sizes: "192x192" },
       ],
-      shortcut: "/favicon.svg",
+      shortcut: "/favicon.ico",
       apple: "/brand/apple-touch-icon.png",
     },
     openGraph: {
@@ -43,6 +49,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#556B80" />
+      </head>
       <body className={`${inter.variable} ${sora.variable} ${fraunces.variable}`}>{children}</body>
     </html>
   );
