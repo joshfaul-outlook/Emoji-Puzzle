@@ -1,5 +1,10 @@
 import type { Metadata, Viewport } from "next";
+import { Fraunces, Inter, Sora } from "next/font/google";
 import "./globals.css";
+
+const inter = Inter({ subsets: ["latin"], variable: "--font-ui", display: "swap" });
+const sora = Sora({ subsets: ["latin"], variable: "--font-brand", display: "swap", weight: ["800"] });
+const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-editorial", display: "swap", weight: ["600"] });
 
 export const metadata: Metadata = {
     metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://emojizzle.com"),
@@ -34,7 +39,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className={`${inter.variable} ${sora.variable} ${fraunces.variable}`}>{children}</body>
     </html>
   );
 }
