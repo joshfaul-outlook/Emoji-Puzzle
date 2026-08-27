@@ -58,6 +58,7 @@ export function originAllowed(request: HttpRequest) {
     const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
     const requestUrl = new URL(request.url);
     const expectedHost = forwardedHost || requestUrl.host;
-    return originUrl.host === expectedHost || (originUrl.hostname === "localhost" && requestUrl.hostname === "localhost");
+    const configuredOrigin = process.env.SITE_ORIGIN;
+    return origin === configuredOrigin || originUrl.host === expectedHost || (originUrl.hostname === "localhost" && requestUrl.hostname === "localhost");
   } catch { return false; }
 }
