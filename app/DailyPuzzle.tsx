@@ -507,7 +507,6 @@ export function DailyPuzzle({
           <BrandWordmark />
         </button>
         <div className="topbar-actions">
-          <span className="player-chip" title="Player name">{identity.displayName}</span>
           <button className="topbar-share" type="button" onClick={openShareSheet} aria-label="Share Emojizzle">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 16V3" />
@@ -516,13 +515,7 @@ export function DailyPuzzle({
             </svg>
             <span>Share</span>
           </button>
-          {puzzle.pool !== "practice" && (
-            <div className="day-pill">
-              {puzzle.context === "daily"
-                ? puzzle.dateCode
-                : `TEST #${puzzle.number}`}
-            </div>
-          )}
+          <span className="player-chip" title="Player name">{identity.displayName}</span>
         </div>
       </header>
 
@@ -547,6 +540,13 @@ export function DailyPuzzle({
 
       {!isFinished ? (
         <section className="play-card" aria-labelledby="puzzle-title">
+          {puzzle.pool !== "practice" && (
+            <div className="day-pill puzzle-card-number">
+              {puzzle.context === "daily"
+                ? puzzle.dateCode
+                : `TEST #${puzzle.number}`}
+            </div>
+          )}
           <div className="eyebrow">
             {puzzle.context === "challenge"
               ? "Practice challenge"
@@ -631,6 +631,13 @@ export function DailyPuzzle({
         </section>
       ) : (
         <section className={`result-card ${play.outcome}`} aria-labelledby="result-title">
+          {puzzle.pool !== "practice" && (
+            <div className="day-pill puzzle-card-number">
+              {puzzle.context === "daily"
+                ? puzzle.dateCode
+                : `TEST #${puzzle.number}`}
+            </div>
+          )}
           <div className="confetti" aria-hidden="true">
             <i /><i /><i /><i /><i /><i />
           </div>

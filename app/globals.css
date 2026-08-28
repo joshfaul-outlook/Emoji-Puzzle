@@ -250,6 +250,13 @@ input, textarea, select { font-size: 16px; }
   text-align: center;
 }
 
+.puzzle-card-number {
+  position: absolute;
+  z-index: 2;
+  top: 14px;
+  right: 16px;
+}
+
 .eyebrow, .result-kicker {
   color: var(--brand-slate);
   font-size: 12px;
@@ -650,7 +657,7 @@ footer span:first-child { color: var(--ink); font-family: Georgia, serif; font-s
   .topbar-share > span:last-child { display: none; }
   .topbar-actions { gap: 6px; }
   .player-chip { max-width: 88px; padding-inline: 8px; }
-  .topbar .day-pill { min-height: 26px; padding: 4px 7px; font-size: 11px; letter-spacing: .03em; }
+  .puzzle-card-number { min-height: 26px; padding: 4px 7px; font-size: 11px; letter-spacing: .03em; }
   .play-card, .result-card { margin-top: 23px; padding-inline: 16px; border-radius: 22px; }
   .mode-switch { margin-top: 12px; margin-bottom: -10px; }
   .play-card { padding-top: 27px; }
