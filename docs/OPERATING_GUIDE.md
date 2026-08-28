@@ -8,9 +8,7 @@ Before provisioning, confirm the active Azure tenant and subscription. The deplo
 
 GitHub production must define `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `ADMIN_PASSWORD`, and `ADMIN_SESSION_SECRET` in its protected `production` environment. The Azure identity uses OIDC and is granted Contributor only on `emoji-daily-prod-rg`. Subscription-scope bootstrap and budget changes are run manually by an authorized subscription operator.
 
-The production deployment workflow runs after pushes to the repository’s `deploy` branch or by manual dispatch. It validates the web app and API with Node 22, then uses the protected `production` environment and Azure OIDC to retrieve the existing Static Web Apps deployment token and publish both the static site and `/api`. Configure the `production` environment approval rules before enabling automatic deploys.
-
-The production workflow validates both apps, provisions the existing production resource group idempotently, seeds the catalog once, deploys the exact static/API build, and smoke-tests the generated hostname. It runs only for `main` and manual dispatches; pull requests never access production storage.
+The production deployment workflow runs only after pushes to the repository’s `deploy` branch or by manual dispatch; pushes to `main` do not deploy. It validates the web app and API with pinned Node 22.13.0 before requesting access to the protected `production` environment. It then uses Azure OIDC to provision the existing production resource group idempotently, package the Static Web Apps configuration with the validated frontend artifact, seed the catalog, publish the static site and `/api`, and smoke-test `https://emojizzle.com`. Configure the `production` environment approval rules before enabling automatic deploys. Pull requests never access production storage.
 
 ## Puzzle operations
 

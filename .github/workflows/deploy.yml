@@ -47,7 +47,9 @@ jobs:
       - name: Build static web app
         env:
           NEXT_PUBLIC_SITE_URL: https://emojizzle.com
-        run: npm run build
+        run: |
+          npm run build
+          cp staticwebapp.config.json out/staticwebapp.config.json
       - name: Store static build
         uses: actions/upload-artifact@v4
         with:
@@ -65,6 +67,14 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - name: Install API dependencies
+        run: npm ci --prefix api
       - name: Restore static build
         uses: actions/download-artifact@v4
         with:
@@ -77,6 +87,7 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       - name: Provision production resources
+        id: infra
         env:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           ADMIN_SESSION_SECRET: ${{ secrets.ADMIN_SESSION_SECRET }}
@@ -88,28 +99,43 @@ jobs:
             --template-file infra/resources.bicep \
             --parameters location=eastus2 appName="$APP_NAME" adminPassword="$ADMIN_PASSWORD" adminSessionSecret="$ADMIN_SESSION_SECRET" openAiApiKey="$OPENAI_API_KEY" customDomain=emojizzle.com \
             --output none
-      - name: Get Static Web Apps deployment token
-        id: static-web-app
-        shell: bash
-        run: |
-          token="$(az staticwebapp secrets list \
-            --name "$APP_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --query properties.apiKey \
-            --output tsv)"
-          if [[ -z "$token" ]]; then
-            echo "Static Web Apps deployment token was not returned." >&2
+          site_name="$(az deployment group show --name emoji-daily-production --resource-group "$RESOURCE_GROUP" --query properties.outputs.staticWebAppName.value --output tsv)"
+          storage_name="$(az deployment group show --name emoji-daily-production --resource-group "$RESOURCE_GROUP" --query properties.outputs.storageAccountName.value --output tsv)"
+          deploy_token="$(az staticwebapp secrets list --name "$site_name" --resource-group "$RESOURCE_GROUP" --query properties.apiKey --output tsv)"
+          connection="$(az storage account show-connection-string --name "$storage_name" --resource-group "$RESOURCE_GROUP" --query connectionString --output tsv)"
+          if [[ -z "$site_name" || -z "$storage_name" || -z "$deploy_token" || -z "$connection" ]]; then
+            echo "One or more required Azure deployment outputs were not returned." >&2
             exit 1
           fi
-          echo "::add-mask::$token"
-          echo "token=$token" >> "$GITHUB_OUTPUT"
+          echo "::add-mask::$deploy_token"
+          echo "::add-mask::$connection"
+          echo "site_name=$site_name" >> "$GITHUB_OUTPUT"
+          echo "storage_name=$storage_name" >> "$GITHUB_OUTPUT"
+          echo "deploy_token=$deploy_token" >> "$GITHUB_OUTPUT"
+          echo "connection=$connection" >> "$GITHUB_OUTPUT"
+      - name: Seed puzzle catalog
+        env:
+          TABLE_STORAGE_CONNECTION_STRING: ${{ steps.infra.outputs.connection }}
+        run: npm run seed
       - name: Deploy web app and API
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ steps.static-web-app.outputs.token }}
+          azure_static_web_apps_api_token: ${{ steps.infra.outputs.deploy_token }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           app_location: out
           output_location: ""
           api_location: api
           skip_app_build: true
+      - name: Smoke test production
+        run: |
+          site_url="https://emojizzle.com"
+          curl --fail --retry 5 --retry-delay 5 "$site_url/"
+          puzzle="$(curl --fail --retry 5 --retry-delay 5 "$site_url/api/puzzles/current?mode=daily")"
+          puzzle_id="$(jq -r '.puzzle.id' <<< "$puzzle")"
+          puzzle_pool="$(jq -r '.puzzle.pool' <<< "$puzzle")"
+          status="$(curl --silent --output /dev/null --write-out '%{http_code}' --retry 5 --retry-delay 5 \
+            -H "Origin: $site_url" -H 'Content-Type: application/json' \
+            --data "{\"puzzleId\":\"$puzzle_id\",\"pool\":\"$puzzle_pool\",\"guess\":\"__production_smoke_test__\"}" \
+            "$site_url/api/guess")"
+          test "$status" = "401"
