@@ -5,6 +5,8 @@ import { deriveCatalogOrder, moveInCatalog, normalizeCatalogOrder, positionsForO
 
 const puzzleTableName = "PuzzleCatalog";
 const feedbackTableName = "PuzzleFeedback";
+const playerTableName = "PlayerDirectory";
+const playTableName = "PuzzlePlays";
 const orderRowKey = "__catalog_order__";
 
 function connectionString() {
@@ -15,6 +17,8 @@ function connectionString() {
 
 export function puzzleTable() { return TableClient.fromConnectionString(connectionString(), puzzleTableName); }
 export function feedbackTable() { return TableClient.fromConnectionString(connectionString(), feedbackTableName); }
+export function playerTable() { return TableClient.fromConnectionString(connectionString(), playerTableName); }
+export function playTable() { return TableClient.fromConnectionString(connectionString(), playTableName); }
 
 type PuzzleEntity = TableEntity & {
   number: number; pool: string; position: number; status: string; emoji: string; answer: string;
@@ -120,7 +124,145 @@ export async function updatePuzzle(existing: StoredPuzzle, input: Partial<Stored
   return getPuzzle(existing.id);
 }
 
-export type FeedbackRecord = { puzzleId: string; puzzleNumber: number; puzzlePool: PuzzlePool; rating: "up" | "down"; comment: string | null; playId: string; anonymousSessionId: string; outcome: "solved" | "revealed"; guessCount: number; hintCount: number; metadataJson: string };
+export type PlayerRecord = {
+  playerId: string;
+  displayName: string;
+  normalizedDisplayName: string;
+  tokenHash: string;
+  createdAt: string;
+  lastSeenAt: string;
+};
+
+type PlayerEntity = TableEntity & PlayerRecord;
+
+export class NameUnavailableError extends Error {}
+export class PlayConflictError extends Error {}
+
+export async function playerNameAvailable(normalizedDisplayName: string) {
+  try {
+    await playerTable().getEntity("Players", `name:${normalizedDisplayName}`);
+    return false;
+  } catch (error) {
+    if ((error as { statusCode?: number }).statusCode === 404) return true;
+    throw error;
+  }
+}
+
+export async function createPlayer(input: { playerId: string; displayName: string; normalizedDisplayName: string; tokenHash: string }) {
+  const now = new Date().toISOString();
+  const record: PlayerRecord = { ...input, createdAt: now, lastSeenAt: now };
+  const transaction = new TableTransaction();
+  transaction.createEntity({ partitionKey: "Players", rowKey: `player:${input.playerId}`, ...record });
+  transaction.createEntity({ partitionKey: "Players", rowKey: `name:${input.normalizedDisplayName}`, playerId: input.playerId, createdAt: now });
+  try {
+    await playerTable().submitTransaction(transaction.actions);
+  } catch (error) {
+    if ((error as { statusCode?: number }).statusCode === 409) throw new NameUnavailableError("Display name is unavailable");
+    throw error;
+  }
+  return record;
+}
+
+export async function getPlayer(playerId: string) {
+  try {
+    const entity = await playerTable().getEntity<PlayerEntity>("Players", `player:${playerId}`);
+    return { playerId: entity.playerId, displayName: entity.displayName, normalizedDisplayName: entity.normalizedDisplayName, tokenHash: entity.tokenHash, createdAt: entity.createdAt, lastSeenAt: entity.lastSeenAt } satisfies PlayerRecord;
+  } catch (error) {
+    if ((error as { statusCode?: number }).statusCode === 404) return null;
+    throw error;
+  }
+}
+
+export async function touchPlayer(player: PlayerRecord) {
+  const lastSeenAt = new Date().toISOString();
+  await playerTable().updateEntity({ partitionKey: "Players", rowKey: `player:${player.playerId}`, lastSeenAt }, "Merge", { etag: "*" });
+  return { ...player, lastSeenAt };
+}
+
+export type PlayContext = "daily" | "practice" | "challenge" | "author-test";
+export type PuzzlePlay = {
+  playerId: string; playId: string; puzzleId: string; puzzleNumber: number; pool: PuzzlePool; context: PlayContext; rankingEligible: boolean;
+  startedAt: string; lastActionAt: string; completedAt: string | null; guessCount: number; hintCount: number;
+  outcome: "playing" | "solved" | "revealed"; createdAt: string; updatedAt: string;
+};
+
+type PlayEntity = TableEntity & PuzzlePlay;
+
+function fromPlayEntity(entity: PlayEntity): PuzzlePlay {
+  return { playerId: entity.playerId, playId: entity.playId, puzzleId: entity.puzzleId, puzzleNumber: entity.puzzleNumber, pool: entity.pool, context: entity.context, rankingEligible: entity.rankingEligible, startedAt: entity.startedAt, lastActionAt: entity.lastActionAt, completedAt: entity.completedAt ?? null, guessCount: entity.guessCount, hintCount: entity.hintCount, outcome: entity.outcome, createdAt: entity.createdAt, updatedAt: entity.updatedAt };
+}
+
+function playEntity(play: PuzzlePlay) { return { partitionKey: play.playerId, rowKey: `play:${play.playId}`, ...play }; }
+
+export async function getPlay(playerId: string, playId: string) {
+  try { return fromPlayEntity(await playTable().getEntity<PlayEntity>(playerId, `play:${playId}`)); }
+  catch (error) { if ((error as { statusCode?: number }).statusCode === 404) return null; throw error; }
+}
+
+export async function startPlay(input: Omit<PuzzlePlay, "startedAt" | "lastActionAt" | "completedAt" | "guessCount" | "hintCount" | "outcome" | "createdAt" | "updatedAt">) {
+  const existing = await getPlay(input.playerId, input.playId);
+  if (existing) {
+    if (existing.puzzleId !== input.puzzleId || existing.pool !== input.pool || existing.context !== input.context) throw new PlayConflictError("Play ID belongs to another attempt");
+    return { play: existing, created: false };
+  }
+  const now = new Date().toISOString();
+  const play: PuzzlePlay = { ...input, startedAt: now, lastActionAt: now, completedAt: null, guessCount: 0, hintCount: 0, outcome: "playing", createdAt: now, updatedAt: now };
+  try { await playTable().createEntity(playEntity(play)); return { play, created: true }; }
+  catch (error) {
+    if ((error as { statusCode?: number }).statusCode !== 409) throw error;
+    const raced = await getPlay(input.playerId, input.playId);
+    if (!raced || raced.puzzleId !== input.puzzleId || raced.pool !== input.pool || raced.context !== input.context) throw new PlayConflictError("Play ID belongs to another attempt");
+    return { play: raced, created: false };
+  }
+}
+
+type PlayAction = { playerId: string; playId: string; puzzleId: string; pool: PuzzlePool; operationId: string; kind: "guess" | "hint" | "reveal"; correct?: boolean; hintIndex?: number };
+
+export async function applyPlayAction(action: PlayAction) {
+  const actionRowKey = `action:${action.playId}:${action.operationId}`;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await playTable().getEntity(action.playerId, actionRowKey);
+      const repeated = await getPlay(action.playerId, action.playId);
+      if (!repeated) throw new PlayConflictError("Play not found");
+      return { play: repeated, repeated: true };
+    } catch (error) {
+      if ((error as { statusCode?: number }).statusCode !== 404) throw error;
+    }
+    const entity = await playTable().getEntity<PlayEntity>(action.playerId, `play:${action.playId}`).catch((error) => {
+      if ((error as { statusCode?: number }).statusCode === 404) throw new PlayConflictError("Play not found");
+      throw error;
+    });
+    if (entity.puzzleId !== action.puzzleId || entity.pool !== action.pool) throw new PlayConflictError("Play does not match puzzle");
+    if (entity.outcome !== "playing") throw new PlayConflictError("Play is already complete");
+    const now = new Date().toISOString();
+    const next = fromPlayEntity(entity);
+    next.lastActionAt = now; next.updatedAt = now;
+    if (action.kind === "guess") {
+      next.guessCount += 1;
+      if (action.correct) { next.outcome = "solved"; next.completedAt = now; }
+    } else if (action.kind === "hint") {
+      if (action.hintIndex === undefined || action.hintIndex > next.hintCount) throw new PlayConflictError("Hints must be requested in order");
+      next.hintCount = Math.max(next.hintCount, action.hintIndex + 1);
+    } else { next.outcome = "revealed"; next.completedAt = now; }
+    const transaction = new TableTransaction();
+    transaction.updateEntity(playEntity(next), "Replace", { etag: entity.etag });
+    transaction.createEntity({ partitionKey: action.playerId, rowKey: actionRowKey, playId: action.playId, kind: action.kind, createdAt: now });
+    try { await playTable().submitTransaction(transaction.actions); return { play: next, repeated: false }; }
+    catch (error) {
+      const status = (error as { statusCode?: number }).statusCode;
+      if (status === 409) {
+        const repeated = await getPlay(action.playerId, action.playId);
+        if (!repeated) throw new PlayConflictError("Play not found");
+        return { play: repeated, repeated: true };
+      }
+      if (status !== 412) throw error;
+    }
+  }
+  throw new PlayConflictError("Play changed too many times");
+}
+
+export type FeedbackRecord = { puzzleId: string; puzzleNumber: number; puzzlePool: PuzzlePool; rating: "up" | "down"; comment: string | null; playId: string; anonymousSessionId: string; playerId?: string; displayName?: string; outcome: "solved" | "revealed"; guessCount: number; hintCount: number; metadataJson: string };
 
 export async function insertFeedback(record: FeedbackRecord) {
   const createdAt = new Date().toISOString();
@@ -131,7 +273,7 @@ export async function insertFeedback(record: FeedbackRecord) {
 export async function listFeedback(limit = 250) {
   const items: Array<FeedbackRecord & { id: string; createdAt: string }> = [];
   for await (const entity of feedbackTable().listEntities<TableEntity & FeedbackRecord & { createdAt: string }>()) {
-    items.push({ id: entity.rowKey, createdAt: entity.createdAt, puzzleId: entity.puzzleId, puzzleNumber: entity.puzzleNumber, puzzlePool: entity.puzzlePool, rating: entity.rating, comment: entity.comment, outcome: entity.outcome, guessCount: entity.guessCount, hintCount: entity.hintCount, playId: "", anonymousSessionId: "", metadataJson: "" });
+    items.push({ id: entity.rowKey, createdAt: entity.createdAt, puzzleId: entity.puzzleId, puzzleNumber: entity.puzzleNumber, puzzlePool: entity.puzzlePool, rating: entity.rating, comment: entity.comment, outcome: entity.outcome, guessCount: entity.guessCount, hintCount: entity.hintCount, playId: entity.playId ?? "", anonymousSessionId: "", playerId: entity.playerId, displayName: entity.displayName, metadataJson: "" });
   }
-  return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit).map((item) => ({ id: item.id, createdAt: item.createdAt, puzzleId: item.puzzleId, puzzleNumber: item.puzzleNumber, puzzlePool: item.puzzlePool, rating: item.rating, comment: item.comment ?? null, outcome: item.outcome, guessCount: item.guessCount, hintCount: item.hintCount }));
+  return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit).map((item) => ({ id: item.id, createdAt: item.createdAt, puzzleId: item.puzzleId, puzzleNumber: item.puzzleNumber, puzzlePool: item.puzzlePool, rating: item.rating, comment: item.comment ?? null, outcome: item.outcome, guessCount: item.guessCount, hintCount: item.hintCount, playerId: item.playerId ?? null, displayName: item.displayName ?? null, playId: item.playId }));
 }

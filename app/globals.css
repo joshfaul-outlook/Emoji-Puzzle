@@ -58,6 +58,20 @@ input, textarea, select { font-size: 16px; }
   flex-direction: column;
 }
 
+.identity-shell { min-height: 100dvh; display: grid; place-items: center; padding: max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); }
+.identity-card { width: min(100%,440px); display: grid; gap: 12px; border: 1px solid var(--line); border-radius: 26px; padding: 28px 24px; background: var(--card); box-shadow: var(--shadow); }
+.identity-brand { display: flex; align-items: center; gap: 11px; margin-bottom: 8px; font-size: 22px; }
+.identity-card h1 { margin: 0; font-family: var(--font-editorial); font-size: clamp(31px,8vw,43px); line-height: 1; }
+.identity-card > p:not(.admin-eyebrow) { margin: 2px 0 8px; color: var(--muted); line-height: 1.5; }
+.identity-card form { display: grid; gap: 8px; }
+.identity-card label { font-size: 12px; font-weight: 800; }
+.identity-card input { width: 100%; min-height: 52px; border: 1px solid #cbc5b9; border-radius: 12px; padding: 10px 13px; background: white; }
+.identity-card small { color: var(--muted); font-size: 11px; }
+.identity-card .primary-button { width: 100%; margin-top: 5px; }
+.name-status { min-height: 18px; margin: 2px 0 !important; font-size: 12px; font-weight: 700; }
+.name-status.available { color: #42624c !important; }.name-status.taken, .name-status.invalid { color: var(--danger) !important; }
+.player-chip { max-width: 130px; overflow: hidden; border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; color: var(--brand-slate); background: rgba(255,255,255,.55); font-size: 11px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+
 /* Azure admin portal */
 .admin-shell { width: min(100%, 1120px); min-height: 100dvh; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-right)) max(110px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
 .admin-header { min-height: 68px; display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 14px; border-bottom: 1px solid rgba(24,37,58,.12); }
@@ -635,6 +649,7 @@ footer span:first-child { color: var(--ink); font-family: Georgia, serif; font-s
   .brand-mark { width: 27px; height: 27px; }
   .topbar-share > span:last-child { display: none; }
   .topbar-actions { gap: 6px; }
+  .player-chip { max-width: 88px; padding-inline: 8px; }
   .topbar .day-pill { min-height: 26px; padding: 4px 7px; font-size: 11px; letter-spacing: .03em; }
   .play-card, .result-card { margin-top: 23px; padding-inline: 16px; border-radius: 22px; }
   .mode-switch { margin-top: 12px; margin-bottom: -10px; }

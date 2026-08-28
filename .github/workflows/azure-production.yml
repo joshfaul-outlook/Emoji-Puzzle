@@ -89,8 +89,8 @@ jobs:
           puzzle=$(curl --fail --retry 5 --retry-delay 5 "$site_url/api/puzzles/current?mode=daily")
           puzzle_id=$(jq -r '.puzzle.id' <<< "$puzzle")
           puzzle_pool=$(jq -r '.puzzle.pool' <<< "$puzzle")
-          curl --fail --retry 5 --retry-delay 5 \
-            -H "Origin: $site_url" \
-            -H 'Content-Type: application/json' \
+          status=$(curl --silent --output /dev/null --write-out '%{http_code}' --retry 5 --retry-delay 5 \
+            -H "Origin: $site_url" -H 'Content-Type: application/json' \
             --data "{\"puzzleId\":\"$puzzle_id\",\"pool\":\"$puzzle_pool\",\"guess\":\"__production_smoke_test__\"}" \
-            "$site_url/api/guess"
+            "$site_url/api/guess")
+          test "$status" = "401"

@@ -27,6 +27,7 @@ import {
   restorePracticeProgress,
 } from "../lib/play-state.ts";
 import { feedbackPlayFields } from "../lib/feedback-payload.ts";
+import { PLAYER_IDENTITY_KEY, normalizePlayerName, playerHeaders, readPlayerIdentity, savePlayerIdentity } from "../lib/player-identity.ts";
 
 function memoryStorage(entries = {}) {
   const values = new Map(Object.entries(entries));
@@ -37,8 +38,18 @@ function memoryStorage(entries = {}) {
     setItem(key, value) {
       values.set(key, value);
     },
+    removeItem(key) { values.delete(key); },
   };
 }
+
+test("persists only valid versioned player identities and builds credential headers", () => {
+  const identity = { playerId: "123e4567-e89b-42d3-a456-426614174000", displayName: "Puzzle Dad", token: "a".repeat(43) };
+  const storage = memoryStorage(); savePlayerIdentity(storage, identity);
+  assert.deepEqual(readPlayerIdentity(storage), identity);
+  assert.deepEqual(playerHeaders(identity), { "x-emojizzle-player-id": identity.playerId, "x-emojizzle-player-token": identity.token });
+  assert.equal(normalizePlayerName("  PUZZLE   Dad ")?.normalizedDisplayName, "puzzle dad");
+  assert.equal(readPlayerIdentity(memoryStorage({ [PLAYER_IDENTITY_KEY]: "broken" })), null);
+});
 
 test("ships 100 varied, fully authored puzzles for the U.S. public test", () => {
   assert.equal(PUZZLES.length, 100);
@@ -149,6 +160,7 @@ test("keeps saved play state isolated while advancing through sequence puzzles",
   const puzzle2Key = dailyPlayStorageKey(PUZZLES[1].id, "260806");
   const puzzle3Key = dailyPlayStorageKey(PUZZLES[2].id, "260807");
   const puzzle2State = {
+    version: 1,
     playId: "puzzle-2-play",
     guessCount: 4,
     hints: ["A phrase"],
@@ -163,6 +175,7 @@ test("keeps saved play state isolated while advancing through sequence puzzles",
   assert.equal(storage.getItem(puzzle3Key), null, "advancing does not copy the prior puzzle save");
 
   const puzzle3State = {
+    version: 1,
     playId: "puzzle-3-play",
     guessCount: 1,
     hints: [],
@@ -185,6 +198,12 @@ test("keeps saved play state isolated while advancing through sequence puzzles",
     },
     "feedback for puzzle 3 uses puzzle 3's play state, never puzzle 2's resolution or outcome",
   );
+});
+
+test("rejects unversioned play saves so pre-feature attempts restart cleanly", () => {
+  const key = dailyPlayStorageKey(PUZZLES[0].id, "260805");
+  const storage = memoryStorage({ [key]: JSON.stringify({ playId: "legacy-play", guessCount: 2, hints: [], outcome: "playing", resolution: null, feedbackSent: false }) });
+  assert.equal(restorePlay(storage, key), null);
 });
 
 test("restores valid practice progress and isolates replay cycles", () => {
@@ -212,15 +231,17 @@ test("counts down to the next UTC puzzle launch in hours and minutes", () => {
   assert.equal(formatTimeUntilPuzzleLaunch(launchAt, launchAt), "0h 0m");
 });
 
-test("keeps answers server-side and includes the Azure interaction loop", async () => {
-  const [page, practicePage, loader, client, api, storage, admin, editor, emojiSearch, nextRoute, startOverRoute, staticConfig] = await Promise.all([
+test("keeps answers and credentials out of public payloads and includes the identified Azure interaction loop", async () => {
+  const [page, practicePage, loader, gate, client, api, storage, admin, feedbackAdmin, editor, emojiSearch, nextRoute, startOverRoute, staticConfig] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/practice/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/GameLoader.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/PlayerIdentityGate.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/DailyPuzzle.tsx", import.meta.url), "utf8"),
     readFile(new URL("../api/src/index.ts", import.meta.url), "utf8"),
     readFile(new URL("../api/src/storage.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/admin/AdminDashboard.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/admin/feedback/FeedbackDashboard.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/admin/puzzle/PuzzleEditor.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/admin/puzzle/EmojiSearch.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/next/page.tsx", import.meta.url), "utf8"),
@@ -249,14 +270,27 @@ test("keeps answers server-side and includes the Azure interaction loop", async 
   assert.match(client, /Daily/);
   assert.match(client, /Practice/);
   assert.match(client, /Can you beat my result/);
+  assert.match(client, /playerHeaders\(identity\)/);
+  assert.match(loader, /PlayerIdentityGate/);
+  assert.match(gate, /Choose your player name/);
+  assert.match(gate, /players\/availability/);
+  const sharingBlock = client.slice(client.indexOf("function shareUrl"), client.indexOf("function getAnonymousSessionId"));
+  assert.doesNotMatch(sharingBlock, /identity|playerId|token/);
   assert.match(client, /puzzle\.pool !== "practice"/);
   assert.doesNotMatch(client, /PRACTICE \$\{puzzle\.sequenceNumber\}/);
   assert.match(api, /anonymousSessionId/);
+  assert.match(api, /players\/availability/);
+  assert.match(api, /plays\/start/);
+  assert.match(api, /authenticatedPlayer/);
   assert.match(api, /pool === "practice" && comment !== null/);
   assert.match(storage, /PuzzleCatalog/);
   assert.match(storage, /PuzzleFeedback/);
+  assert.match(storage, /PlayerDirectory/);
+  assert.match(storage, /PuzzlePlays/);
+  assert.doesNotMatch(storage, /guess(?:Text|Value|Candidate)/i);
   assert.match(storage, /etag/);
   assert.match(admin, /New puzzle/);
+  assert.match(feedbackAdmin, /Anonymous/);
   assert.match(editor, /Publish/);
   assert.match(editor, /Archive/);
   assert.match(emojiSearch, /Use suggested/);

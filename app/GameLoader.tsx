@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { DailyPuzzle, type ChallengeBenchmark } from "./DailyPuzzle";
 import type { PublicPuzzle } from "../lib/public-puzzle";
 import { KnowingMark } from "./components/KnowingMark";
+import { PlayerIdentityGate } from "./PlayerIdentityGate";
 
 type LoaderMode = "daily" | "practice" | "next";
 
@@ -56,13 +57,15 @@ export function GameLoader({ mode }: { mode: LoaderMode }) {
       ? { outcome, guessCount: guesses, hintCount: hints }
       : null;
 
-  return (
+  return <PlayerIdentityGate>{(identity, invalidateIdentity) => (
     <DailyPuzzle
-      key={`${result.puzzle.context}:${result.puzzle.id}`}
+      key={`${result.puzzle.context}:${result.puzzle.id}:${identity.playerId}`}
       puzzle={result.puzzle}
+      identity={identity}
+      invalidateIdentity={invalidateIdentity}
       nextPuzzleNumber={result.nextPuzzleNumber}
       challengeBenchmark={challengeBenchmark}
       resumePractice={mode === "practice" && !query.has("puzzle") && !query.has("challenge")}
     />
-  );
+  )}</PlayerIdentityGate>;
 }

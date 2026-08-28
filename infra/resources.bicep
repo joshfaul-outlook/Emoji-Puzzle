@@ -42,6 +42,16 @@ resource puzzleFeedback 'Microsoft.Storage/storageAccounts/tableServices/tables@
   name: 'PuzzleFeedback'
 }
 
+resource playerDirectory 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
+  parent: tableService
+  name: 'PlayerDirectory'
+}
+
+resource puzzlePlays 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
+  parent: tableService
+  name: 'PuzzlePlays'
+}
+
 resource site 'Microsoft.Web/staticSites@2023-12-01' = {
   name: appName
   location: location
