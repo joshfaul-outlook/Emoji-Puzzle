@@ -22,7 +22,7 @@ export default function StartOver() {
     <main className="utility-page">
       <KnowingMark size={64} />
       <h1>Starting fresh…</h1>
-      <p aria-live="polite">Clearing this device’s game progress and returning to today’s puzzle.</p>
+      <p aria-live="polite">Clearing this device’s player identity and game progress, then returning to today’s puzzle.</p>
     </main>
   );
 }

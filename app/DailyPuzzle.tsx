@@ -21,6 +21,7 @@ import {
   type Resolution,
 } from "../lib/play-state";
 import { feedbackPlayFields } from "../lib/feedback-payload";
+import { playerHeaders, type PlayerIdentity } from "../lib/player-identity";
 import { BrandWordmark } from "./components/BrandWordmark";
 import { KnowingMark } from "./components/KnowingMark";
 
@@ -34,6 +35,7 @@ function createId() {
 
 function freshPlay(): PlayState {
   return {
+    version: 1,
     playId: createId(),
     guessCount: 0,
     hints: [],
@@ -45,6 +47,8 @@ function freshPlay(): PlayState {
 
 type DailyPuzzleProps = {
   puzzle: PublicPuzzle;
+  identity: PlayerIdentity;
+  invalidateIdentity: () => void;
   nextPuzzleNumber?: number;
   challengeBenchmark?: ChallengeBenchmark | null;
   resumePractice?: boolean;
@@ -58,6 +62,8 @@ export type ChallengeBenchmark = {
 
 export function DailyPuzzle({
   puzzle,
+  identity,
+  invalidateIdentity,
   nextPuzzleNumber,
   challengeBenchmark = null,
   resumePractice = false,
@@ -76,6 +82,9 @@ export function DailyPuzzle({
   const [comment, setComment] = useState("");
   const [feedbackState, setFeedbackState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [playStorageKey, setPlayStorageKey] = useState<string | null>(null);
+  const [trackingState, setTrackingState] = useState<"starting" | "ready" | "error">("starting");
+  const [trackingRetry, setTrackingRetry] = useState(0);
+  const pendingGuess = useRef<{ guess: string; operationId: string } | null>(null);
   const [practiceProgress, setPracticeProgress] = useState<PracticeProgress>({ position: 1, cycle: 0 });
   const inputRef = useRef<HTMLInputElement>(null);
   const sharePanelRef = useRef<HTMLDivElement>(null);
@@ -132,9 +141,34 @@ export function DailyPuzzle({
       setComment("");
       setFeedbackState("idle");
       setHydratedPuzzleId(puzzle.id);
+      setTrackingState("starting");
     }, 0);
     return () => window.clearTimeout(task);
   }, [challengeBenchmark, puzzle, resumePractice]);
+
+  useEffect(() => {
+    if (hydratedPuzzleId !== puzzle.id || !playStorageKey) return;
+    const controller = new AbortController();
+    fetch("/api/plays/start", {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "content-type": "application/json", ...playerHeaders(identity) },
+      body: JSON.stringify({ playId: play.playId, puzzleId: puzzle.id, pool: puzzle.pool, context: puzzle.context }),
+    }).then(async (response) => {
+      if (response.status === 401) { invalidateIdentity(); return; }
+      if (!response.ok) throw new Error("play start failed");
+      const data = await response.json() as { play: Pick<PlayState, "guessCount" | "outcome"> & { hintCount: number }; hints?: string[]; resolution?: Resolution };
+      setPlay((current) => ({
+        ...current,
+        guessCount: data.play.guessCount,
+        hints: data.hints ?? current.hints.slice(0, data.play.hintCount),
+        outcome: data.play.outcome,
+        resolution: data.play.outcome === "playing" ? null : data.resolution ?? current.resolution,
+      }));
+      setTrackingState("ready");
+    }).catch((error) => { if (error?.name !== "AbortError") setTrackingState("error"); });
+    return () => controller.abort();
+  }, [hydratedPuzzleId, identity, invalidateIdentity, play.playId, playStorageKey, puzzle.context, puzzle.id, puzzle.pool, trackingRetry]);
 
   useEffect(() => {
     if (hydratedPuzzleId === puzzle.id && playStorageKey) {
@@ -202,18 +236,23 @@ export function DailyPuzzle({
     setBusy(true);
     setMessage("");
     const nextGuessCount = play.guessCount + 1;
+    const operationId = pendingGuess.current?.guess === trimmed ? pendingGuess.current.operationId : `guess-${createId()}`;
+    pendingGuess.current = { guess: trimmed, operationId };
     try {
       const response = await fetch("/api/guess", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ puzzleId: puzzle.id, pool: puzzle.pool, guess: trimmed }),
+        headers: { "content-type": "application/json", ...playerHeaders(identity) },
+        body: JSON.stringify({ puzzleId: puzzle.id, pool: puzzle.pool, playId: play.playId, operationId, guess: trimmed }),
       });
+      if (response.status === 401) { invalidateIdentity(); return; }
+      if (!response.ok) throw new Error("guess failed");
       const data = (await response.json()) as {
         correct?: boolean;
         resolution?: Resolution;
       };
 
       if (data.correct && data.resolution) {
+        pendingGuess.current = null;
         setPlay((current) => ({
           ...current,
           guessCount: nextGuessCount,
@@ -222,6 +261,7 @@ export function DailyPuzzle({
         }));
         setMessage("");
       } else {
+        pendingGuess.current = null;
         setPlay((current) => ({ ...current, guessCount: nextGuessCount }));
         setGuess("");
         setMessage("Not quite — try another angle.");
@@ -241,9 +281,11 @@ export function DailyPuzzle({
     try {
       const response = await fetch("/api/hint", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ puzzleId: puzzle.id, pool: puzzle.pool, hintIndex: play.hints.length }),
+        headers: { "content-type": "application/json", ...playerHeaders(identity) },
+        body: JSON.stringify({ puzzleId: puzzle.id, pool: puzzle.pool, playId: play.playId, operationId: `hint-${play.hints.length}`, hintIndex: play.hints.length }),
       });
+      if (response.status === 401) { invalidateIdentity(); return; }
+      if (!response.ok) throw new Error("hint failed");
       const data = (await response.json()) as { hint?: string };
       if (data.hint) {
         setPlay((current) => ({ ...current, hints: [...current.hints, data.hint as string] }));
@@ -261,9 +303,11 @@ export function DailyPuzzle({
     try {
       const response = await fetch("/api/reveal", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ puzzleId: puzzle.id, pool: puzzle.pool }),
+        headers: { "content-type": "application/json", ...playerHeaders(identity) },
+        body: JSON.stringify({ puzzleId: puzzle.id, pool: puzzle.pool, playId: play.playId, operationId: "reveal" }),
       });
+      if (response.status === 401) { invalidateIdentity(); return; }
+      if (!response.ok) throw new Error("reveal failed");
       const data = (await response.json()) as { resolution?: Resolution };
       if (data.resolution) {
         setPlay((current) => ({
@@ -414,7 +458,7 @@ export function DailyPuzzle({
     try {
       const response = await fetch("/api/feedback", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...playerHeaders(identity) },
         body: JSON.stringify({
           rating: nextRating,
           comment: puzzle.pool === "practice" ? "" : nextComment,
@@ -431,6 +475,7 @@ export function DailyPuzzle({
           },
         }),
       });
+      if (response.status === 401) { invalidateIdentity(); return; }
       if (!response.ok) throw new Error("feedback failed");
       setFeedbackState("sent");
       setPlay((current) => ({ ...current, feedbackSent: true }));
@@ -445,6 +490,15 @@ export function DailyPuzzle({
     await submitFeedback(rating, comment);
   }
 
+  if (trackingState !== "ready") return (
+    <main className="utility-page" aria-busy={trackingState === "starting"}>
+      <KnowingMark size={64} />
+      <h1>{trackingState === "error" ? "Your play couldn’t start" : "Saving your place…"}</h1>
+      <p>{trackingState === "error" ? "Check your connection and try again." : "Just a moment."}</p>
+      {trackingState === "error" && <button className="primary-button" type="button" onClick={() => { setTrackingState("starting"); setTrackingRetry((value) => value + 1); }}>Try again</button>}
+    </main>
+  );
+
   return (
     <main className="game-shell">
       <header className="topbar">
@@ -453,6 +507,7 @@ export function DailyPuzzle({
           <BrandWordmark />
         </button>
         <div className="topbar-actions">
+          <span className="player-chip" title="Player name">{identity.displayName}</span>
           <button className="topbar-share" type="button" onClick={openShareSheet} aria-label="Share Emojizzle">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 16V3" />

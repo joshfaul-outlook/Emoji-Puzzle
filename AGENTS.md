@@ -11,7 +11,7 @@ The core product question is whether we can repeatedly create puzzles that feel 
 - One globally shared puzzle per UTC day.
 - Every new browser-tab session opens in Daily mode; Practice is an explicit session choice.
 - Daily uses the reviewed 20-puzzle rotation; Practice uses a separate append-only, player-unnumbered sequence of easier/pop-culture puzzles and never affects rankings.
-- No in-game account is required.
+- No account or login is required. Each browser installation has one persistent named player identity for attributable play results and feedback.
 - The category is hidden until a hint or the result.
 - Guesses are free-form, deterministic, and unlimited.
 - Hints are authored and revealed one at a time.
@@ -19,7 +19,7 @@ The core product question is whether we can repeatedly create puzzles that feel 
 - The result celebrates the explanation, not a numeric score.
 - Sharing never exposes the answer or emoji sequence.
 - Daily feedback is thumbs up/down with an optional note; Practice feedback is rating-only.
-- Basic play state is device-local; raw feedback is durable and anonymous.
+- Basic play state is device-local; durable play facts and feedback are attributed to the browser player. Cross-device recovery and public profiles do not exist.
 
 Do not add player accounts, monetization, feeds, leaderboards, localization, fuzzy/AI answer judging, or infrastructure beyond the documented Azure production stack unless a validated need is documented first.
 
@@ -30,7 +30,7 @@ Do not add player accounts, monetization, feeds, leaderboards, localization, fuz
 3. Keep content separate from mechanics. Production puzzle edits belong in the admin portal; `lib/puzzles.ts` is the idempotent seed fixture. Rule changes belong in the API game configuration.
 4. Prefer explicit data and small functions over abstractions built for hypothetical future needs.
 5. Keep answers server-side. Never place accepted answers or explanations in the initial page payload.
-6. Collect only useful anonymous context. Do not add names, email addresses, fingerprinting, or precise IP-derived location.
+6. Collect only useful context. Retain the chosen player display name and opaque browser ID, but do not collect email addresses, fingerprinting, or precise IP-derived location.
 7. Design mobile-first and preserve keyboard, screen-reader, reduced-motion, and touch usability.
 8. Treat feedback comments as user research, not public content.
 
@@ -57,7 +57,7 @@ Never silently add fuzzy matching. Add a missed fair answer as an authored varia
 ## Repository map
 
 - `app/` — statically exported game and admin screens
-- `api/` — Azure Functions, Table Storage access, seed/import tools, and API tests
+- `api/` — Azure Functions, Table Storage access for puzzles, players, plays, and feedback, seed/import tools, and API tests
 - `lib/puzzles.ts` — Daily and Practice seed inventory
 - `infra/` — subscription-level Bicep for the production Azure stack
 - `tests/` — product-invariant and mechanics tests
@@ -86,4 +86,4 @@ Never silently add fuzzy matching. Add a missed fair answer as an authored varia
 
 ## Definition of done
 
-A change is done when it is understandable on a phone, preserves spoiler safety and anonymity, passes the repository checks, and leaves the next editor with accurate puzzle data and documentation.
+A change is done when it is understandable on a phone, preserves spoiler and credential safety, passes the repository checks, and leaves the next editor with accurate puzzle data and documentation.

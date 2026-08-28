@@ -2,7 +2,7 @@
 
 ## Production resources
 
-`infra/main.bicep` deploys the `emoji-daily-prod-rg` resource group in `eastus2`, a Free Static Web App, a dedicated Standard LRS storage account, both tables, encrypted application settings, and a subscription budget alert. Storage names receive a deterministic unique suffix.
+`infra/main.bicep` deploys the `emoji-daily-prod-rg` resource group in `eastus2`, a Free Static Web App, a dedicated Standard LRS storage account, the `PuzzleCatalog`, `PuzzleFeedback`, `PlayerDirectory`, and `PuzzlePlays` tables, encrypted application settings, and a subscription budget alert. Storage names receive a deterministic unique suffix.
 
 Before provisioning, confirm the active Azure tenant and subscription. The deployment requires a budget notification email, `ADMIN_PASSWORD`, and a random `ADMIN_SESSION_SECRET` of at least 32 characters. Do not commit any of these values.
 
@@ -30,7 +30,9 @@ Export historical D1 feedback read-only to JSON without changing the dormant dat
 TABLE_STORAGE_CONNECTION_STRING="..." npm --prefix api run import:feedback -- /path/to/export.json
 ```
 
-The import uses stable hashes, so rerunning it does not duplicate records. Reconcile the source count with the Azure table count before considering the migration complete.
+The import uses stable hashes, so rerunning it does not duplicate records. Imported historical feedback intentionally has no player attribution. Reconcile the source count with the Azure table count before considering the migration complete.
+
+Player-directory and play tables are additive and are created idempotently by infrastructure and local seeding. Existing feedback rows require no backfill. Clearing site data removes the browser credential and prompts for a new name; it does not release the old normalized-name reservation.
 
 ## Custom domain and SSL
 

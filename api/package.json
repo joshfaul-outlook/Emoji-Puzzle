@@ -7,7 +7,7 @@
   "engines": { "node": ">=22.13.0" },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test": "npm run build && node --experimental-strip-types scripts/test.mjs",
     "seed": "tsx scripts/seed.ts",
     "import:feedback": "tsx scripts/import-feedback.ts"
   },

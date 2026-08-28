@@ -7,6 +7,7 @@ export type Resolution = {
 export type Outcome = "playing" | "solved" | "revealed";
 
 export type PlayState = {
+  version: 1;
   playId: string;
   guessCount: number;
   hints: string[];
@@ -34,7 +35,11 @@ export function restorePlay(storage: StorageLike, storageKey: string): PlayState
   if (!saved) return null;
 
   try {
-    return JSON.parse(saved) as PlayState;
+    const parsed = JSON.parse(saved) as Partial<PlayState>;
+    if (parsed.version !== 1 || typeof parsed.playId !== "string" || !/^[A-Za-z0-9_-]{8,100}$/.test(parsed.playId)) return null;
+    if (!Number.isInteger(parsed.guessCount) || (parsed.guessCount as number) < 0 || !Array.isArray(parsed.hints)) return null;
+    if (parsed.outcome !== "playing" && parsed.outcome !== "solved" && parsed.outcome !== "revealed") return null;
+    return parsed as PlayState;
   } catch {
     return null;
   }

@@ -8,7 +8,8 @@ Looks obvious. Eventually. · https://emojizzle.com
 
 - Next.js static export hosted on Azure Static Web Apps Free
 - Node 22 managed Azure Functions under `/api`
-- Azure Table Storage tables `PuzzleCatalog` and `PuzzleFeedback`
+- Azure Table Storage tables `PuzzleCatalog`, `PuzzleFeedback`, `PlayerDirectory`, and `PuzzlePlays`
+- Browser-local named player identity with hashed server-side credentials
 - Signed static-password admin sessions
 - Bundled Emojibase keyword search and deterministic phrase suggestions
 

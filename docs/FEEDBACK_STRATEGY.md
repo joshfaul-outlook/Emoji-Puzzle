@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The feedback loop should improve puzzle craft and the daily ritual without turning the MVP into an analytics project.
+The feedback loop should improve puzzle craft and the daily ritual without turning the product into a generalized analytics project.
 
 The initial questions are:
 
@@ -14,7 +14,7 @@ The initial questions are:
 
 ## What is captured now
 
-After a Daily solve or reveal, a player can select thumbs up or down and optionally explain why. Practice and standalone challenges collect thumbs only, with comments rejected server-side. Every record includes its puzzle pool, outcome, guess count, hints used, timestamp, and limited anonymous device context so Daily and Practice signals can be reviewed separately.
+After a Daily solve or reveal, a player can select thumbs up or down and optionally explain why. Practice and standalone challenges collect thumbs only, with comments rejected server-side. Every new record includes the browser player's opaque ID and display-name snapshot plus its puzzle pool, outcome, guess count, hints used, timestamp, and limited device context. Historical anonymous rows remain readable.
 
 This combines explicit sentiment with enough play context to interpret it. It intentionally does not produce a universal score.
 
@@ -72,6 +72,6 @@ Avoid changing hint policy, result copy, sharing, and answer acceptance simultan
 
 ## Later, only if needed
 
-Add event-level analytics when a concrete question cannot be answered from result feedback—for example, where players abandon before reaching a result. If added, document the event, purpose, retention, and privacy impact before collection begins.
+Durable per-attempt play rows retain counts, outcome, eligibility, and timing even when feedback is not submitted. They do not retain guess text. Add broader event-level analytics only when a concrete question cannot be answered from these facts and result feedback; document its purpose, retention, and privacy impact first.
 
 The internal read-only feedback report supports the existing manual review cadence without adding event tracking, write controls, or a public dashboard. An export or analysis notebook can follow once raw volume makes manual review inconvenient. A CRUD admin UI remains out of scope.

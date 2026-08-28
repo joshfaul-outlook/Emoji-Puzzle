@@ -4,6 +4,7 @@ import { isAcceptedGuess, normalizeGuess, validatePuzzle } from "../src/model.ts
 import { adminConfigured, createSessionCookie, isAdmin, originAllowed, passwordAccepted } from "../src/auth.ts";
 import { moveInCatalog, positionsForOrder } from "../src/ordering.ts";
 import { suggestPuzzle } from "../src/suggestions.ts";
+import { createPlayerToken, hashPlayerToken, isRankingEligiblePlay, normalizePlayerName, playerTokenMatches } from "../src/player-identity.ts";
 
 const puzzle = { answer: "Vincent van Gogh", acceptedAnswers: ["Vincent van Gogh", "Van Gogh"], pool: "daily", emoji: "🎨 🌻 👂", category: "Person", explanation: "A painter represented by sunflowers and his famous injured ear.", hints: ["Person", "Painter", "The ear"], status: "published" };
 
@@ -11,6 +12,27 @@ test("normalizes guesses without fuzzy matching", () => {
   assert.equal(normalizeGuess(" Víncent van-Gogh! "), "vincent van gogh");
   assert.equal(isAcceptedGuess(puzzle, "VincentvanGogh"), true);
   assert.equal(isAcceptedGuess(puzzle, "Vincnet van Gogh"), false);
+});
+
+test("normalizes and validates player display names predictably", () => {
+  assert.deepEqual(normalizePlayerName("  PuzzleDad  "), { displayName: "PuzzleDad", normalizedDisplayName: "puzzledad" });
+  assert.deepEqual(normalizePlayerName("Puzzle   Dad"), { displayName: "Puzzle Dad", normalizedDisplayName: "puzzle dad" });
+  assert.deepEqual(normalizePlayerName("Ｐｕｚｚｌｅ１"), { displayName: "Puzzle1", normalizedDisplayName: "puzzle1" });
+  for (const invalid of ["ab", "a".repeat(21), "puzzle!", "emoji😀", "   "]) assert.equal(normalizePlayerName(invalid), null);
+});
+
+test("hashes browser credentials and rejects altered tokens", () => {
+  const token = createPlayerToken(); const hash = hashPlayerToken(token);
+  assert.equal(token.length, 43); assert.equal(hash.length, 64);
+  assert.equal(playerTokenMatches(token, hash), true);
+  assert.equal(playerTokenMatches(`${token.slice(0, -1)}${token.endsWith("a") ? "b" : "a"}`, hash), false);
+  assert.equal(playerTokenMatches("short", hash), false);
+});
+
+test("marks only the current ordinary Daily context ranking eligible", () => {
+  assert.equal(isRankingEligiblePlay("daily", "daily", true), true);
+  assert.equal(isRankingEligiblePlay("daily", "daily", false), false);
+  for (const context of ["practice", "challenge", "author-test"]) assert.equal(isRankingEligiblePlay(context, "practice", true), false);
 });
 
 test("allows answer-only drafts and validates all publish fields", () => {

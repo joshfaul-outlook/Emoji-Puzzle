@@ -30,4 +30,7 @@ export type FeedbackItem = {
   outcome: "solved" | "revealed";
   guessCount: number;
   hintCount: number;
+  playerId: string | null;
+  displayName: string | null;
+  playId: string;
 };
