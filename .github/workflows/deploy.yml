@@ -94,16 +94,18 @@ jobs:
           PLAYER_RECOVERY_HMAC_SECRET: ${{ secrets.PLAYER_RECOVERY_HMAC_SECRET }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           EMAIL_DOMAIN_READY: ${{ vars.ACS_EMAIL_DOMAIN_READY || 'false' }}
+          GAME_LAUNCH_DATE: ${{ vars.GAME_LAUNCH_DATE || '2026-08-05' }}
         run: |
           if [[ "$EMAIL_DOMAIN_READY" != "true" ]]; then
             echo "ACS email domain must be verified and ACS_EMAIL_DOMAIN_READY must be true before releasing recoverable identity." >&2
             exit 1
           fi
+          node -e 'const value = process.env.GAME_LAUNCH_DATE; const parsed = Date.parse(`${value}T00:00:00Z`); if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(parsed) || new Date(parsed).toISOString().slice(0, 10) !== value) { console.error("GAME_LAUNCH_DATE must be a valid date in YYYY-MM-DD format."); process.exit(1); }'
           az deployment group create \
             --name emoji-daily-production \
             --resource-group "$RESOURCE_GROUP" \
             --template-file infra/resources.bicep \
-            --parameters location=eastus2 appName="$APP_NAME" adminPassword="$ADMIN_PASSWORD" adminSessionSecret="$ADMIN_SESSION_SECRET" playerRecoveryHmacSecret="$PLAYER_RECOVERY_HMAC_SECRET" openAiApiKey="$OPENAI_API_KEY" customDomain=emojizzle.com emailDomain=auth.emojizzle.com emailDomainReady="$EMAIL_DOMAIN_READY" \
+            --parameters location=eastus2 appName="$APP_NAME" adminPassword="$ADMIN_PASSWORD" adminSessionSecret="$ADMIN_SESSION_SECRET" playerRecoveryHmacSecret="$PLAYER_RECOVERY_HMAC_SECRET" openAiApiKey="$OPENAI_API_KEY" gameLaunchDate="$GAME_LAUNCH_DATE" customDomain=emojizzle.com emailDomain=auth.emojizzle.com emailDomainReady="$EMAIL_DOMAIN_READY" \
             --output none
           site_name="$(az deployment group show --name emoji-daily-production --resource-group "$RESOURCE_GROUP" --query properties.outputs.staticWebAppName.value --output tsv)"
           storage_name="$(az deployment group show --name emoji-daily-production --resource-group "$RESOURCE_GROUP" --query properties.outputs.storageAccountName.value --output tsv)"

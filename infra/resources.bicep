@@ -10,6 +10,10 @@ param playerRecoveryHmacSecret string
 @secure()
 param openAiApiKey string = ''
 param openAiModel string = 'gpt-5.6-luna'
+@description('UTC date assigned to the first Daily puzzle, in YYYY-MM-DD format.')
+@minLength(10)
+@maxLength(10)
+param gameLaunchDate string = '2026-08-05'
 param customDomain string = ''
 param emailDomain string = 'auth.emojizzle.com'
 @description('Set only after the custom email domain has verified SPF and DKIM in Azure.')
@@ -115,6 +119,7 @@ resource appSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
     ACS_EMAIL_SENDER_ADDRESS: 'players@${emailDomain}'
     OPENAI_API_KEY: openAiApiKey
     OPENAI_MODEL: openAiModel
+    GAME_LAUNCH_DATE: gameLaunchDate
     SITE_ORIGIN: empty(customDomain)
       ? 'https://${site.properties.defaultHostname}'
       : 'https://${customDomain}'

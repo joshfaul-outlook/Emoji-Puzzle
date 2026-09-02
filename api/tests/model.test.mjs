@@ -5,8 +5,16 @@ import { adminConfigured, createSessionCookie, isAdmin, originAllowed, passwordA
 import { moveInCatalog, positionsForOrder } from "../src/ordering.ts";
 import { suggestPuzzle } from "../src/suggestions.ts";
 import { createPlayerToken, createVerificationCode, hashPlayerToken, hashVerificationCode, isRankingEligiblePlay, normalizePlayerName, normalizeRecoveryEmail, playerTokenMatches, recoveryEmailKey, verificationCodeMatches } from "../src/player-identity.ts";
+import { defaultGameLaunchDate, parseGameLaunchDate } from "../src/game-config.ts";
 
 const puzzle = { answer: "Vincent van Gogh", acceptedAnswers: ["Vincent van Gogh", "Van Gogh"], pool: "daily", emoji: "🎨 🌻 👂", category: "Person", explanation: "A painter represented by sunflowers and his famous injured ear.", hints: ["Person", "Painter", "The ear"], status: "published" };
+
+test("uses a configurable, validated UTC game launch date", () => {
+  assert.equal(defaultGameLaunchDate, "2026-08-05");
+  assert.equal(parseGameLaunchDate("2026-09-02"), Date.parse("2026-09-02T00:00:00Z"));
+  assert.throws(() => parseGameLaunchDate("09/02/2026"), /YYYY-MM-DD/);
+  assert.throws(() => parseGameLaunchDate("2026-02-30"), /valid UTC calendar date/);
+});
 
 test("normalizes guesses without fuzzy matching", () => {
   assert.equal(normalizeGuess(" Víncent van-Gogh! "), "vincent van gogh");

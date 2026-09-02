@@ -2,13 +2,14 @@ import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } 
 import { randomUUID } from "node:crypto";
 import { adminConfigured, clearSessionCookie, createSessionCookie, isAdmin, passwordAccepted } from "./auth.js";
 import { body, json, requireAdmin, requireOrigin } from "./http.js";
+import { parseGameLaunchDate } from "./game-config.js";
 import { isAcceptedGuess, validatePuzzle, type PuzzlePool, type PuzzleStatus, type StoredPuzzle } from "./model.js";
 import { createPlayerToken, createVerificationCode, hashPlayerToken, hashVerificationCode, isRankingEligiblePlay, normalizePlayerName, normalizeRecoveryEmail, playerTokenMatches, recoveryEmailKey, verificationClientKey, verificationCodeMatches } from "./player-identity.js";
 import { applyPlayAction, consumeVerificationChallenge, createPlayerSession, createPlayerWithSession, createVerificationChallenge, getPlay, getPlayer, getPlayerByEmailKey, getPlayerByNormalizedName, getPlayerSession, getVerificationChallenge, insertFeedback, listFeedback, listPlayerSessions, listPuzzles, markFeedbackSubmitted, NameUnavailableError, playerNameAvailable, PlayConflictError, recordVerificationFailure, revokePlayerSession, startPlay, touchPlayer, touchPlayerSession, VerificationConflictError, VerificationRateLimitError, createPuzzle, getPuzzle, updatePuzzle, type PlayContext, type PlayerRecord, type PlayerSession, type VerificationPurpose } from "./storage.js";
 import { suggestPuzzle } from "./suggestions.js";
 import { verificationSender } from "./verification-sender.js";
 
-const launchDate = Date.parse("2026-08-05T00:00:00Z");
+const launchDate = parseGameLaunchDate();
 const playerIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const sessionIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const operationIdPattern = /^[A-Za-z0-9_-]{1,100}$/;

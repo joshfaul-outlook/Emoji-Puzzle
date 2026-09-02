@@ -13,6 +13,10 @@ param adminSessionSecret string
 param playerRecoveryHmacSecret string
 @secure()
 param openAiApiKey string = ''
+@description('UTC date assigned to the first Daily puzzle, in YYYY-MM-DD format.')
+@minLength(10)
+@maxLength(10)
+param gameLaunchDate string = '2026-08-05'
 @description('Email that receives the monthly budget alert.')
 param budgetEmail string
 @description('Production custom hostname. Set to an empty string only to use the generated Azure hostname.')
@@ -37,6 +41,7 @@ module production './resources.bicep' = {
     adminSessionSecret: adminSessionSecret
     playerRecoveryHmacSecret: playerRecoveryHmacSecret
     openAiApiKey: openAiApiKey
+    gameLaunchDate: gameLaunchDate
     customDomain: customDomain
     emailDomain: emailDomain
     emailDomainReady: emailDomainReady

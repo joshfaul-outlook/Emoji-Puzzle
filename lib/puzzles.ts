@@ -25,7 +25,7 @@ export type PuzzlePool = "daily" | "practice";
 export type PlayContext = "daily" | "practice" | "challenge" | "author-test";
 
 export const GAME_CONFIG = {
-  launchDate: "2026-08-05",
+  launchDate: process.env.GAME_LAUNCH_DATE?.trim() || "2026-08-05",
   dayBoundary: "UTC" as const,
   cycleAfterLastPuzzle: true,
   maxCommentLength: 500,

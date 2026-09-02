@@ -5,6 +5,7 @@ import {
   DAILY_PUZZLES,
   ADDITIONAL_PRACTICE_PUZZLES,
   ALL_PUZZLES,
+  GAME_CONFIG,
   PRACTICE_PUZZLES,
   PUZZLES,
   formatTimeUntilPuzzleLaunch,
@@ -127,17 +128,18 @@ test("keeps shortened and cultural spellings explicitly authored", () => {
 });
 
 test("uses one shared UTC puzzle for the whole calendar day", () => {
-  const morning = getDailyPuzzle(new Date("2026-08-06T00:00:01Z"));
-  const evening = getDailyPuzzle(new Date("2026-08-06T23:59:59Z"));
+  const secondDay = new Date(Date.parse(`${GAME_CONFIG.launchDate}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+  const morning = getDailyPuzzle(new Date(`${secondDay}T00:00:01Z`));
+  const evening = getDailyPuzzle(new Date(`${secondDay}T23:59:59Z`));
   assert.equal(morning.id, evening.id);
   assert.equal(morning.number, 2);
 });
 
 test("derives the daily edition code from the actual UTC date", () => {
-  const now = new Date("2026-08-25T18:00:00Z");
+  const now = new Date(Date.parse(`${GAME_CONFIG.launchDate}T00:00:00Z`) + DAILY_PUZZLES.length * 86_400_000 + 18 * 3_600_000);
   const publicPuzzle = toPublicPuzzle(getDailyPuzzle(now), { pool: "daily", context: "daily", now });
-  assert.equal(getPuzzleDateCode(now), "260825");
-  assert.equal(publicPuzzle.dateCode, "260825");
+  assert.equal(getPuzzleDateCode(now), now.toISOString().slice(2, 10).replace(/-/g, ""));
+  assert.equal(publicPuzzle.dateCode, getPuzzleDateCode(now));
   assert.equal(publicPuzzle.rankingEligible, true);
   assert.equal(publicPuzzle.legacyStorageEligible, false, "a repeated puzzle must not restore its first-cycle save");
 });
@@ -146,7 +148,8 @@ test("cycles Daily after 20 and Practice after its independent final puzzle", ()
   assert.equal(getNextPuzzle(DAILY_PUZZLES[0], "daily").number, 2);
   assert.equal(getNextPuzzle(DAILY_PUZZLES.at(-1), "daily").number, 1);
   assert.equal(getNextPuzzle(PRACTICE_PUZZLES.at(-1), "practice").id, PRACTICE_PUZZLES[0].id);
-  assert.equal(getDailyPuzzle(new Date("2026-08-25T00:00:00Z")).number, 1);
+  const secondCycle = new Date(Date.parse(`${GAME_CONFIG.launchDate}T00:00:00Z`) + DAILY_PUZZLES.length * 86_400_000);
+  assert.equal(getDailyPuzzle(secondCycle).number, 1);
 });
 
 test("only the genuine daily context is ranking eligible", () => {
