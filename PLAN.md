@@ -2,7 +2,7 @@
 
 ## Current baseline
 
-Emoji Daily ships as a mobile-first static web app with a same-origin Azure API. It has one shared UTC Daily puzzle, a separate 330-puzzle Practice sequence, deterministic answer matching, three authored hints, explicit reveal, spoiler-free sharing, device-local play continuity, and a persistent named identity scoped to each browser installation.
+Emoji Daily ships as a mobile-first static web app with a same-origin Azure API. It has one shared UTC Daily puzzle, a separate 330-puzzle Practice sequence, deterministic answer matching, three authored hints, explicit reveal, spoiler-free sharing, server-resumable Daily play, and a passwordless recoverable named identity with independent device sessions.
 
 Azure Table Storage is the production source of truth for puzzles, player-name reservations, durable play facts, and feedback. The private `/admin/` portal supports searching, drafting, editing, publishing, archiving, restoring, drag-and-drop pool ordering, emoji keyword search, AI phrase suggestions, and attributed feedback review. The original 350 records remain an idempotent migration fixture.
 
@@ -24,4 +24,4 @@ Azure Table Storage is the production source of truth for puzzles, player-name r
 
 ## Deferred work
 
-Player accounts/login, cross-device recovery, public profiles, rankings formulas/UI, roles, audit logs, bulk operations, hard deletion, fuzzy judging, monetization, leaderboards, localization, and Standard-plan features remain out of scope until usage establishes a need.
+Passwords, conventional account management, public profiles, rankings formulas/UI, roles, audit logs, bulk operations, hard deletion, fuzzy judging, monetization, leaderboards, localization, and full cross-device Practice synchronization remain out of scope until usage establishes a need.

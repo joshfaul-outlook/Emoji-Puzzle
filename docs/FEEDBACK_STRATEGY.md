@@ -14,7 +14,7 @@ The initial questions are:
 
 ## What is captured now
 
-After a Daily solve or reveal, a player can select thumbs up or down and optionally explain why. Practice and standalone challenges collect thumbs only, with comments rejected server-side. Every new record includes the browser player's opaque ID and display-name snapshot plus its puzzle pool, outcome, guess count, hints used, timestamp, and limited device context. Historical anonymous rows remain readable.
+After a Daily solve or reveal, a player can select thumbs up or down and optionally explain why. Practice and standalone challenges collect thumbs only, with comments rejected server-side. Every record includes the recovered player's opaque ID and display-name snapshot plus its puzzle pool, outcome, guess count, hints used, timestamp, and limited device context. Feedback submission is also marked on the durable play so another device can restore that state.
 
 This combines explicit sentiment with enough play context to interpret it. It intentionally does not produce a universal score.
 

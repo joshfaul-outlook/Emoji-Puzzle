@@ -35,7 +35,7 @@ if (!seeded) {
 
 const feedback = TableClient.fromConnectionString(connectionString, "PuzzleFeedback");
 await feedback.createTable().catch((error: { statusCode?: number }) => { if (error.statusCode !== 409) throw error; });
-for (const tableName of ["PlayerDirectory", "PuzzlePlays"]) {
+for (const tableName of ["PlayerDirectory", "PuzzlePlays", "PlayerVerifications"]) {
   const table = TableClient.fromConnectionString(connectionString, tableName);
   await table.createTable().catch((error: { statusCode?: number }) => { if (error.statusCode !== 409) throw error; });
 }

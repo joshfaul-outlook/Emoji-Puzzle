@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { TableClient, TableTransaction, type TableEntity } from "@azure/data-tables";
 import type { PuzzlePool, PuzzleStatus, PuzzleStructure, StoredPuzzle } from "./model.js";
 import { deriveCatalogOrder, moveInCatalog, normalizeCatalogOrder, positionsForOrder, type CatalogOrder } from "./ordering.js";
@@ -7,6 +7,7 @@ const puzzleTableName = "PuzzleCatalog";
 const feedbackTableName = "PuzzleFeedback";
 const playerTableName = "PlayerDirectory";
 const playTableName = "PuzzlePlays";
+const verificationTableName = "PlayerVerifications";
 const orderRowKey = "__catalog_order__";
 
 function connectionString() {
@@ -19,6 +20,7 @@ export function puzzleTable() { return TableClient.fromConnectionString(connecti
 export function feedbackTable() { return TableClient.fromConnectionString(connectionString(), feedbackTableName); }
 export function playerTable() { return TableClient.fromConnectionString(connectionString(), playerTableName); }
 export function playTable() { return TableClient.fromConnectionString(connectionString(), playTableName); }
+export function verificationTable() { return TableClient.fromConnectionString(connectionString(), verificationTableName); }
 
 type PuzzleEntity = TableEntity & {
   number: number; pool: string; position: number; status: string; emoji: string; answer: string;
@@ -128,14 +130,61 @@ export type PlayerRecord = {
   playerId: string;
   displayName: string;
   normalizedDisplayName: string;
-  tokenHash: string;
+  recoveryEmailKey: string;
+  recoveryVerifiedAt: string;
   createdAt: string;
   lastSeenAt: string;
 };
 
 type PlayerEntity = TableEntity & PlayerRecord;
 
+export type PlayerSession = {
+  sessionId: string;
+  playerId: string;
+  tokenHash: string;
+  createdAt: string;
+  lastSeenAt: string;
+  revokedAt: string | null;
+};
+
+type PlayerSessionEntity = TableEntity & Omit<PlayerSession, "revokedAt"> & { revokedAt?: string };
+
+export type VerificationPurpose = "create" | "recover";
+export type VerificationChallenge = {
+  challengeId: string;
+  purpose: VerificationPurpose;
+  emailKey: string;
+  clientKey: string | null;
+  proposedDisplayName: string | null;
+  normalizedDisplayName: string | null;
+  playerId: string | null;
+  codeHash: string;
+  createdAt: string;
+  expiresAt: string;
+  attemptCount: number;
+  consumedAt: string | null;
+  etag: string;
+};
+
+type VerificationEntity = TableEntity & {
+  challengeId: string;
+  purpose: VerificationPurpose;
+  emailKey: string;
+  clientKey?: string;
+  proposedDisplayName?: string;
+  normalizedDisplayName?: string;
+  playerId?: string;
+  codeHash: string;
+  createdAt: string;
+  expiresAt: string;
+  attemptCount: number;
+  consumedAt?: string;
+};
+
 export class NameUnavailableError extends Error {}
+export class EmailUnavailableError extends Error {}
+export class VerificationRateLimitError extends Error {}
+export class VerificationConflictError extends Error {}
 export class PlayConflictError extends Error {}
 
 export async function playerNameAvailable(normalizedDisplayName: string) {
@@ -148,25 +197,42 @@ export async function playerNameAvailable(normalizedDisplayName: string) {
   }
 }
 
-export async function createPlayer(input: { playerId: string; displayName: string; normalizedDisplayName: string; tokenHash: string }) {
+export async function createPlayerWithSession(input: {
+  playerId: string;
+  displayName: string;
+  normalizedDisplayName: string;
+  recoveryEmailKey: string;
+  sessionId: string;
+  tokenHash: string;
+}) {
   const now = new Date().toISOString();
-  const record: PlayerRecord = { ...input, createdAt: now, lastSeenAt: now };
+  const record: PlayerRecord = {
+    playerId: input.playerId,
+    displayName: input.displayName,
+    normalizedDisplayName: input.normalizedDisplayName,
+    recoveryEmailKey: input.recoveryEmailKey,
+    recoveryVerifiedAt: now,
+    createdAt: now,
+    lastSeenAt: now,
+  };
   const transaction = new TableTransaction();
   transaction.createEntity({ partitionKey: "Players", rowKey: `player:${input.playerId}`, ...record });
   transaction.createEntity({ partitionKey: "Players", rowKey: `name:${input.normalizedDisplayName}`, playerId: input.playerId, createdAt: now });
+  transaction.createEntity({ partitionKey: "Players", rowKey: `email:${input.recoveryEmailKey}`, playerId: input.playerId, createdAt: now });
+  transaction.createEntity({ partitionKey: "Players", rowKey: `session:${input.sessionId}`, sessionId: input.sessionId, playerId: input.playerId, tokenHash: input.tokenHash, createdAt: now, lastSeenAt: now });
   try {
     await playerTable().submitTransaction(transaction.actions);
   } catch (error) {
-    if ((error as { statusCode?: number }).statusCode === 409) throw new NameUnavailableError("Display name is unavailable");
+    if ((error as { statusCode?: number }).statusCode === 409) throw new NameUnavailableError("Display name or recovery email is unavailable");
     throw error;
   }
-  return record;
+  return { player: record, session: { sessionId: input.sessionId, playerId: input.playerId, tokenHash: input.tokenHash, createdAt: now, lastSeenAt: now, revokedAt: null } satisfies PlayerSession };
 }
 
 export async function getPlayer(playerId: string) {
   try {
     const entity = await playerTable().getEntity<PlayerEntity>("Players", `player:${playerId}`);
-    return { playerId: entity.playerId, displayName: entity.displayName, normalizedDisplayName: entity.normalizedDisplayName, tokenHash: entity.tokenHash, createdAt: entity.createdAt, lastSeenAt: entity.lastSeenAt } satisfies PlayerRecord;
+    return { playerId: entity.playerId, displayName: entity.displayName, normalizedDisplayName: entity.normalizedDisplayName, recoveryEmailKey: entity.recoveryEmailKey, recoveryVerifiedAt: entity.recoveryVerifiedAt, createdAt: entity.createdAt, lastSeenAt: entity.lastSeenAt } satisfies PlayerRecord;
   } catch (error) {
     if ((error as { statusCode?: number }).statusCode === 404) return null;
     throw error;
@@ -179,41 +245,188 @@ export async function touchPlayer(player: PlayerRecord) {
   return { ...player, lastSeenAt };
 }
 
+export async function getPlayerByEmailKey(emailKey: string) {
+  try {
+    const index = await playerTable().getEntity<TableEntity & { playerId: string }>("Players", `email:${emailKey}`);
+    return getPlayer(index.playerId);
+  } catch (error) {
+    if ((error as { statusCode?: number }).statusCode === 404) return null;
+    throw error;
+  }
+}
+
+export async function getPlayerByNormalizedName(normalizedDisplayName: string) {
+  try {
+    const index = await playerTable().getEntity<TableEntity & { playerId: string }>("Players", `name:${normalizedDisplayName}`);
+    return getPlayer(index.playerId);
+  } catch (error) {
+    if ((error as { statusCode?: number }).statusCode === 404) return null;
+    throw error;
+  }
+}
+
+export async function listPlayerSessions(playerId: string) {
+  const sessions: PlayerSession[] = [];
+  for await (const entity of playerTable().listEntities<PlayerSessionEntity>({ queryOptions: { filter: `PartitionKey eq 'Players' and playerId eq '${playerId}'` } })) {
+    if (entity.rowKey.startsWith("session:")) sessions.push(fromSessionEntity(entity));
+  }
+  return sessions;
+}
+
+function fromSessionEntity(entity: PlayerSessionEntity): PlayerSession {
+  return { sessionId: entity.sessionId, playerId: entity.playerId, tokenHash: entity.tokenHash, createdAt: entity.createdAt, lastSeenAt: entity.lastSeenAt, revokedAt: entity.revokedAt ?? null };
+}
+
+export async function createPlayerSession(input: { sessionId: string; playerId: string; tokenHash: string }) {
+  const now = new Date().toISOString();
+  const session = { ...input, createdAt: now, lastSeenAt: now, revokedAt: null } satisfies PlayerSession;
+  await playerTable().createEntity({ partitionKey: "Players", rowKey: `session:${input.sessionId}`, sessionId: input.sessionId, playerId: input.playerId, tokenHash: input.tokenHash, createdAt: now, lastSeenAt: now });
+  return session;
+}
+
+export async function getPlayerSession(sessionId: string) {
+  try { return fromSessionEntity(await playerTable().getEntity<PlayerSessionEntity>("Players", `session:${sessionId}`)); }
+  catch (error) { if ((error as { statusCode?: number }).statusCode === 404) return null; throw error; }
+}
+
+export async function touchPlayerSession(session: PlayerSession) {
+  const lastSeenAt = new Date().toISOString();
+  await playerTable().updateEntity({ partitionKey: "Players", rowKey: `session:${session.sessionId}`, lastSeenAt }, "Merge", { etag: "*" });
+  return { ...session, lastSeenAt };
+}
+
+export async function revokePlayerSession(sessionId: string) {
+  const revokedAt = new Date().toISOString();
+  await playerTable().updateEntity({ partitionKey: "Players", rowKey: `session:${sessionId}`, revokedAt }, "Merge", { etag: "*" });
+}
+
+function fromVerificationEntity(entity: VerificationEntity): VerificationChallenge {
+  return {
+    challengeId: entity.challengeId,
+    purpose: entity.purpose,
+    emailKey: entity.emailKey,
+    clientKey: entity.clientKey ?? null,
+    proposedDisplayName: entity.proposedDisplayName ?? null,
+    normalizedDisplayName: entity.normalizedDisplayName ?? null,
+    playerId: entity.playerId ?? null,
+    codeHash: entity.codeHash,
+    createdAt: entity.createdAt,
+    expiresAt: entity.expiresAt,
+    attemptCount: entity.attemptCount,
+    consumedAt: entity.consumedAt ?? null,
+    etag: String(entity.etag ?? ""),
+  };
+}
+
+export async function createVerificationChallenge(input: {
+  challengeId: string;
+  purpose: VerificationPurpose;
+  emailKey: string;
+  clientKey?: string;
+  proposedDisplayName?: string;
+  normalizedDisplayName?: string;
+  playerId?: string;
+  codeHash: string;
+}, now = new Date()) {
+  const recent: VerificationEntity[] = [];
+  for await (const entity of verificationTable().listEntities<VerificationEntity>({ queryOptions: { filter: `PartitionKey eq 'Challenges' and emailKey eq '${input.emailKey}'` } })) recent.push(entity);
+  if (input.clientKey) {
+    const clientRecent: VerificationEntity[] = [];
+    for await (const entity of verificationTable().listEntities<VerificationEntity>({ queryOptions: { filter: `PartitionKey eq 'Challenges' and clientKey eq '${input.clientKey}'` } })) clientRecent.push(entity);
+    if (clientRecent.filter((item) => now.getTime() - Date.parse(item.createdAt) < 3_600_000).length >= 20) throw new VerificationRateLimitError("Too many verification codes requested");
+  }
+  const active = recent.filter((item) => !item.consumedAt);
+  const newest = active.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  if (newest && now.getTime() - Date.parse(newest.createdAt) < 60_000) throw new VerificationRateLimitError("Please wait before requesting another code");
+  if (recent.filter((item) => now.getTime() - Date.parse(item.createdAt) < 3_600_000).length >= 5) throw new VerificationRateLimitError("Too many verification codes requested");
+  for (const item of active) {
+    await verificationTable().updateEntity({ partitionKey: "Challenges", rowKey: item.rowKey, consumedAt: now.toISOString() }, "Merge", { etag: "*" });
+  }
+  const createdAt = now.toISOString();
+  const entity = {
+    partitionKey: "Challenges", rowKey: input.challengeId, challengeId: input.challengeId, purpose: input.purpose, emailKey: input.emailKey,
+    ...(input.clientKey ? { clientKey: input.clientKey } : {}),
+    ...(input.proposedDisplayName ? { proposedDisplayName: input.proposedDisplayName } : {}),
+    ...(input.normalizedDisplayName ? { normalizedDisplayName: input.normalizedDisplayName } : {}),
+    ...(input.playerId ? { playerId: input.playerId } : {}),
+    codeHash: input.codeHash, createdAt, expiresAt: new Date(now.getTime() + 10 * 60_000).toISOString(), attemptCount: 0,
+  };
+  await verificationTable().createEntity(entity);
+  return { ...input, createdAt, expiresAt: entity.expiresAt, attemptCount: 0, consumedAt: null };
+}
+
+export async function getVerificationChallenge(challengeId: string) {
+  try { return fromVerificationEntity(await verificationTable().getEntity<VerificationEntity>("Challenges", challengeId)); }
+  catch (error) { if ((error as { statusCode?: number }).statusCode === 404) return null; throw error; }
+}
+
+export async function recordVerificationFailure(challenge: VerificationChallenge) {
+  try {
+    await verificationTable().updateEntity({ partitionKey: "Challenges", rowKey: challenge.challengeId, attemptCount: challenge.attemptCount + 1 }, "Merge", { etag: challenge.etag });
+  } catch (error) {
+    if ((error as { statusCode?: number }).statusCode === 412) throw new VerificationConflictError("Verification challenge changed");
+    throw error;
+  }
+}
+
+export async function consumeVerificationChallenge(challenge: VerificationChallenge) {
+  try {
+    await verificationTable().updateEntity({ partitionKey: "Challenges", rowKey: challenge.challengeId, consumedAt: new Date().toISOString() }, "Merge", { etag: challenge.etag });
+  } catch (error) {
+    if ((error as { statusCode?: number }).statusCode === 412) throw new VerificationConflictError("Verification code was already used");
+    throw error;
+  }
+}
+
 export type PlayContext = "daily" | "practice" | "challenge" | "author-test";
 export type PuzzlePlay = {
   playerId: string; playId: string; puzzleId: string; puzzleNumber: number; pool: PuzzlePool; context: PlayContext; rankingEligible: boolean;
   startedAt: string; lastActionAt: string; completedAt: string | null; guessCount: number; hintCount: number;
-  outcome: "playing" | "solved" | "revealed"; createdAt: string; updatedAt: string;
+  outcome: "playing" | "solved" | "revealed"; feedbackSubmittedAt: string | null; createdAt: string; updatedAt: string;
 };
 
-type PlayEntity = TableEntity & PuzzlePlay;
+type PlayEntity = TableEntity & Omit<PuzzlePlay, "completedAt" | "feedbackSubmittedAt"> & { completedAt?: string; feedbackSubmittedAt?: string };
 
 function fromPlayEntity(entity: PlayEntity): PuzzlePlay {
-  return { playerId: entity.playerId, playId: entity.playId, puzzleId: entity.puzzleId, puzzleNumber: entity.puzzleNumber, pool: entity.pool, context: entity.context, rankingEligible: entity.rankingEligible, startedAt: entity.startedAt, lastActionAt: entity.lastActionAt, completedAt: entity.completedAt ?? null, guessCount: entity.guessCount, hintCount: entity.hintCount, outcome: entity.outcome, createdAt: entity.createdAt, updatedAt: entity.updatedAt };
+  return { playerId: entity.playerId, playId: entity.playId, puzzleId: entity.puzzleId, puzzleNumber: entity.puzzleNumber, pool: entity.pool, context: entity.context, rankingEligible: entity.rankingEligible, startedAt: entity.startedAt, lastActionAt: entity.lastActionAt, completedAt: entity.completedAt ?? null, guessCount: entity.guessCount, hintCount: entity.hintCount, outcome: entity.outcome, feedbackSubmittedAt: entity.feedbackSubmittedAt ?? null, createdAt: entity.createdAt, updatedAt: entity.updatedAt };
 }
 
-function playEntity(play: PuzzlePlay) { return { partitionKey: play.playerId, rowKey: `play:${play.playId}`, ...play }; }
+function playEntity(play: PuzzlePlay) {
+  const { completedAt, feedbackSubmittedAt, ...required } = play;
+  return { partitionKey: play.playerId, rowKey: `play:${play.playId}`, ...required, ...(completedAt ? { completedAt } : {}), ...(feedbackSubmittedAt ? { feedbackSubmittedAt } : {}) };
+}
+
+export function canonicalDailyPlayId(puzzleId: string) {
+  return `daily-${createHash("sha256").update(puzzleId).digest("base64url").slice(0, 32)}`;
+}
 
 export async function getPlay(playerId: string, playId: string) {
   try { return fromPlayEntity(await playTable().getEntity<PlayEntity>(playerId, `play:${playId}`)); }
   catch (error) { if ((error as { statusCode?: number }).statusCode === 404) return null; throw error; }
 }
 
-export async function startPlay(input: Omit<PuzzlePlay, "startedAt" | "lastActionAt" | "completedAt" | "guessCount" | "hintCount" | "outcome" | "createdAt" | "updatedAt">) {
-  const existing = await getPlay(input.playerId, input.playId);
+export async function startPlay(input: Omit<PuzzlePlay, "startedAt" | "lastActionAt" | "completedAt" | "guessCount" | "hintCount" | "outcome" | "feedbackSubmittedAt" | "createdAt" | "updatedAt">) {
+  const normalizedInput = input.context === "daily" ? { ...input, playId: canonicalDailyPlayId(input.puzzleId) } : input;
+  const existing = await getPlay(normalizedInput.playerId, normalizedInput.playId);
   if (existing) {
-    if (existing.puzzleId !== input.puzzleId || existing.pool !== input.pool || existing.context !== input.context) throw new PlayConflictError("Play ID belongs to another attempt");
+    if (existing.puzzleId !== normalizedInput.puzzleId || existing.pool !== normalizedInput.pool || existing.context !== normalizedInput.context) throw new PlayConflictError("Play ID belongs to another attempt");
     return { play: existing, created: false };
   }
   const now = new Date().toISOString();
-  const play: PuzzlePlay = { ...input, startedAt: now, lastActionAt: now, completedAt: null, guessCount: 0, hintCount: 0, outcome: "playing", createdAt: now, updatedAt: now };
+  const play: PuzzlePlay = { ...normalizedInput, startedAt: now, lastActionAt: now, completedAt: null, guessCount: 0, hintCount: 0, outcome: "playing", feedbackSubmittedAt: null, createdAt: now, updatedAt: now };
   try { await playTable().createEntity(playEntity(play)); return { play, created: true }; }
   catch (error) {
     if ((error as { statusCode?: number }).statusCode !== 409) throw error;
-    const raced = await getPlay(input.playerId, input.playId);
-    if (!raced || raced.puzzleId !== input.puzzleId || raced.pool !== input.pool || raced.context !== input.context) throw new PlayConflictError("Play ID belongs to another attempt");
+    const raced = await getPlay(normalizedInput.playerId, normalizedInput.playId);
+    if (!raced || raced.puzzleId !== normalizedInput.puzzleId || raced.pool !== normalizedInput.pool || raced.context !== normalizedInput.context) throw new PlayConflictError("Play ID belongs to another attempt");
     return { play: raced, created: false };
   }
+}
+
+export async function markFeedbackSubmitted(playerId: string, playId: string) {
+  const submittedAt = new Date().toISOString();
+  await playTable().updateEntity({ partitionKey: playerId, rowKey: `play:${playId}`, feedbackSubmittedAt: submittedAt, updatedAt: submittedAt }, "Merge", { etag: "*" });
+  return submittedAt;
 }
 
 type PlayAction = { playerId: string; playId: string; puzzleId: string; pool: PuzzlePool; operationId: string; kind: "guess" | "hint" | "reveal"; correct?: boolean; hintIndex?: number };
@@ -266,8 +479,15 @@ export type FeedbackRecord = { puzzleId: string; puzzleNumber: number; puzzlePoo
 
 export async function insertFeedback(record: FeedbackRecord) {
   const createdAt = new Date().toISOString();
-  const id = `${createdAt}-${randomUUID()}`;
-  await feedbackTable().createEntity({ partitionKey: createdAt.slice(0, 7).replace("-", ""), rowKey: id, ...record, createdAt });
+  const partitionKey = record.playerId ? `Player-${record.playerId}` : createdAt.slice(0, 7).replace("-", "");
+  const rowKey = record.playerId ? `play:${record.playId}` : `${createdAt}-${randomUUID()}`;
+  try {
+    await feedbackTable().createEntity({ partitionKey, rowKey, ...record, createdAt });
+    return true;
+  } catch (error) {
+    if (record.playerId && (error as { statusCode?: number }).statusCode === 409) return false;
+    throw error;
+  }
 }
 
 export async function listFeedback(limit = 250) {

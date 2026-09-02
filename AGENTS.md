@@ -11,7 +11,7 @@ The core product question is whether we can repeatedly create puzzles that feel 
 - One globally shared puzzle per UTC day.
 - Every new browser-tab session opens in Daily mode; Practice is an explicit session choice.
 - Daily uses the reviewed 20-puzzle rotation; Practice uses a separate append-only, player-unnumbered sequence of easier/pop-culture puzzles and never affects rankings.
-- No account or login is required. Each browser installation has one persistent named player identity for attributable play results and feedback.
+- No password or conventional account is required. Email verification creates and recovers one persistent named player identity; each browser receives an independent opaque session.
 - The category is hidden until a hint or the result.
 - Guesses are free-form, deterministic, and unlimited.
 - Hints are authored and revealed one at a time.
@@ -19,9 +19,9 @@ The core product question is whether we can repeatedly create puzzles that feel 
 - The result celebrates the explanation, not a numeric score.
 - Sharing never exposes the answer or emoji sequence.
 - Daily feedback is thumbs up/down with an optional note; Practice feedback is rating-only.
-- Basic play state is device-local; durable play facts and feedback are attributed to the browser player. Cross-device recovery and public profiles do not exist.
+- Daily play is server-resumable across a player's devices. Practice progression remains device-local. Public profiles do not exist.
 
-Do not add player accounts, monetization, feeds, leaderboards, localization, fuzzy/AI answer judging, or infrastructure beyond the documented Azure production stack unless a validated need is documented first.
+Do not add passwords, conventional account management, monetization, feeds, leaderboards, localization, fuzzy/AI answer judging, or infrastructure beyond the documented Azure production stack unless a validated need is documented first.
 
 ## Working principles
 
@@ -30,7 +30,7 @@ Do not add player accounts, monetization, feeds, leaderboards, localization, fuz
 3. Keep content separate from mechanics. Production puzzle edits belong in the admin portal; `lib/puzzles.ts` is the idempotent seed fixture. Rule changes belong in the API game configuration.
 4. Prefer explicit data and small functions over abstractions built for hypothetical future needs.
 5. Keep answers server-side. Never place accepted answers or explanations in the initial page payload.
-6. Collect only useful context. Retain the chosen player display name and opaque browser ID, but do not collect email addresses, fingerprinting, or precise IP-derived location.
+6. Collect only useful context. Retain the chosen player display name and a keyed recovery-email hash; do not persist raw recovery email, browser fingerprints, or precise IP-derived location.
 7. Design mobile-first and preserve keyboard, screen-reader, reduced-motion, and touch usability.
 8. Treat feedback comments as user research, not public content.
 

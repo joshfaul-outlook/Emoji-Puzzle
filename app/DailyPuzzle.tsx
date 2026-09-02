@@ -157,13 +157,15 @@ export function DailyPuzzle({
     }).then(async (response) => {
       if (response.status === 401) { invalidateIdentity(); return; }
       if (!response.ok) throw new Error("play start failed");
-      const data = await response.json() as { play: Pick<PlayState, "guessCount" | "outcome"> & { hintCount: number }; hints?: string[]; resolution?: Resolution };
+      const data = await response.json() as { play: Pick<PlayState, "guessCount" | "outcome" | "playId"> & { hintCount: number; feedbackSubmittedAt?: string | null }; hints?: string[]; resolution?: Resolution };
       setPlay((current) => ({
         ...current,
+        playId: data.play.playId,
         guessCount: data.play.guessCount,
         hints: data.hints ?? current.hints.slice(0, data.play.hintCount),
         outcome: data.play.outcome,
         resolution: data.play.outcome === "playing" ? null : data.resolution ?? current.resolution,
+        feedbackSent: Boolean(data.play.feedbackSubmittedAt) || current.feedbackSent,
       }));
       setTrackingState("ready");
     }).catch((error) => { if (error?.name !== "AbortError") setTrackingState("error"); });

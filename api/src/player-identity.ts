@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 
 export type NormalizedPlayerName = {
   displayName: string;
@@ -15,6 +15,42 @@ export function normalizePlayerName(value: unknown): NormalizedPlayerName | null
 
 export function createPlayerToken() {
   return randomBytes(32).toString("base64url");
+}
+
+export function normalizeRecoveryEmail(value: unknown) {
+  if (typeof value !== "string") return null;
+  const email = value.trim().toLowerCase();
+  if (email.length < 3 || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+  return email;
+}
+
+function recoverySecret() {
+  const secret = process.env.PLAYER_RECOVERY_HMAC_SECRET;
+  if (!secret || secret.length < 32) throw new Error("PLAYER_RECOVERY_HMAC_SECRET must contain at least 32 characters");
+  return secret;
+}
+
+export function recoveryEmailKey(normalizedEmail: string) {
+  return createHmac("sha256", recoverySecret()).update(`email:${normalizedEmail}`).digest("hex");
+}
+
+export function verificationClientKey(address: string) {
+  return createHmac("sha256", recoverySecret()).update(`client:${address}`).digest("hex");
+}
+
+export function createVerificationCode() {
+  return randomInt(0, 1_000_000).toString().padStart(6, "0");
+}
+
+export function hashVerificationCode(challengeId: string, code: string) {
+  return createHmac("sha256", recoverySecret()).update(`code:${challengeId}:${code}`).digest("hex");
+}
+
+export function verificationCodeMatches(challengeId: string, code: string, expectedHash: string) {
+  if (!/^\d{6}$/.test(code) || !/^[a-f0-9]{64}$/.test(expectedHash)) return false;
+  const actual = Buffer.from(hashVerificationCode(challengeId, code), "hex");
+  const expected = Buffer.from(expectedHash, "hex");
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
 export function hashPlayerToken(token: string) {

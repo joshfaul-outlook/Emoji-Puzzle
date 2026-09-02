@@ -1,10 +1,12 @@
 # Player Identity and Durable Play Data — Feature Plan
 
+> Superseded by `RECOVERABLE_PLAYER_IDENTITY_FEATURE_PLAN.md`. The original browser-only token model documented here is no longer the active invariant.
+
 ## Purpose
 
 Implement lightweight player identity and durable play-result collection now so future rankings can be designed from real data.
 
-This feature must **not** introduce accounts, login, email, passwords, cross-device recovery, public profiles, or rankings UI. A player is a browser-local identity with a unique display name / gamertag.
+This historical plan did not introduce accounts, login, email, passwords, cross-device recovery, public profiles, or rankings UI. Its browser-local identity model has since been replaced by the recoverable identity plan linked above.
 
 The current application already has device-local play state, a per-attempt `playId`, an anonymous browser/session identifier used for feedback, and Azure Table Storage. Build on those existing mechanics rather than creating a generalized analytics system.
 
@@ -268,7 +270,7 @@ Current repository docs describe feedback/play as anonymous and explicitly exclu
 
 Update the relevant documentation (`AGENTS.md`, `GOALS.md`, `PLAN.md`, and `docs/FEEDBACK_STRATEGY.md`) so the new invariant is clear:
 
-> No player account or login is required. Each browser installation has a persistent named player identity used to attribute play results and feedback. Cross-device identity/recovery and public profiles remain out of scope.
+> No conventional player account or login is required. A verified player identity can be recovered across devices and is used to attribute play results and feedback. Public profiles remain out of scope.
 
 Do not describe the feature as a full account/profile system.
 

@@ -6,9 +6,14 @@ param adminPassword string
 @secure()
 param adminSessionSecret string
 @secure()
+param playerRecoveryHmacSecret string
+@secure()
 param openAiApiKey string = ''
 param openAiModel string = 'gpt-5.6-luna'
 param customDomain string = ''
+param emailDomain string = 'auth.emojizzle.com'
+@description('Set only after the custom email domain has verified SPF and DKIM in Azure.')
+param emailDomainReady bool = false
 
 var uniqueSuffix = take(uniqueString(subscription().subscriptionId, resourceGroup().id, appName), 10)
 var storageName = take(replace('${appName}${uniqueSuffix}', '-', ''), 24)
@@ -52,6 +57,47 @@ resource puzzlePlays 'Microsoft.Storage/storageAccounts/tableServices/tables@202
   name: 'PuzzlePlays'
 }
 
+resource playerVerifications 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
+  parent: tableService
+  name: 'PlayerVerifications'
+}
+
+resource emailService 'Microsoft.Communication/emailServices@2025-05-01' = {
+  name: '${appName}-email'
+  location: 'global'
+  properties: {
+    dataLocation: 'United States'
+  }
+}
+
+resource playerEmailDomain 'Microsoft.Communication/emailServices/domains@2025-05-01' = {
+  parent: emailService
+  name: emailDomain
+  location: 'global'
+  properties: {
+    domainManagement: 'CustomerManaged'
+    userEngagementTracking: 'Disabled'
+  }
+}
+
+resource playerEmailSender 'Microsoft.Communication/emailServices/domains/senderUsernames@2025-05-01' = if (emailDomainReady) {
+  parent: playerEmailDomain
+  name: 'players'
+  properties: {
+    displayName: 'Emojizzle'
+    username: 'players'
+  }
+}
+
+resource communicationService 'Microsoft.Communication/communicationServices@2025-05-01' = {
+  name: '${appName}-communication'
+  location: 'global'
+  properties: {
+    dataLocation: 'United States'
+    linkedDomains: emailDomainReady ? [playerEmailDomain.id] : []
+  }
+}
+
 resource site 'Microsoft.Web/staticSites@2023-12-01' = {
   name: appName
   location: location
@@ -72,6 +118,10 @@ resource appSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
     TABLE_STORAGE_CONNECTION_STRING: storageConnectionString
     ADMIN_PASSWORD: adminPassword
     ADMIN_SESSION_SECRET: adminSessionSecret
+    PLAYER_RECOVERY_HMAC_SECRET: playerRecoveryHmacSecret
+    VERIFICATION_SENDER: 'acs'
+    ACS_EMAIL_CONNECTION_STRING: communicationService.listKeys().primaryConnectionString
+    ACS_EMAIL_SENDER_ADDRESS: 'players@${emailDomain}'
     OPENAI_API_KEY: openAiApiKey
     OPENAI_MODEL: openAiModel
     SITE_ORIGIN: empty(customDomain)
@@ -89,3 +139,5 @@ resource domain 'Microsoft.Web/staticSites/customDomains@2023-12-01' = if (!empt
 output staticWebAppName string = site.name
 output defaultHostname string = site.properties.defaultHostname
 output storageAccountName string = storage.name
+output emailDomainResourceId string = playerEmailDomain.id
+output emailDomainReady bool = emailDomainReady

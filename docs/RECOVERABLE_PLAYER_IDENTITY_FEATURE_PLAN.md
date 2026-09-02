@@ -1,5 +1,13 @@
 # Recoverable Player Identity and Cross-Device Daily Play — Feature Plan
 
+## Approved implementation decisions
+
+- Canonical Daily attempts are keyed by `playerId + puzzleId`; the production catalog will not repeat puzzles once built out.
+- The current player, play, verification, and feedback tables contain disposable test data and will be reset at rollout. `PuzzleCatalog` is retained.
+- Because of that reset, v1 credential migration and duplicate-player cleanup tooling are deliberately omitted.
+- Production verification mail uses Azure Communication Services Email from `Emojizzle <players@auth.emojizzle.com>`.
+- Sessions are long-lived and revocable, recovery lookup uses a dedicated HMAC secret, and Practice progression remains device-local.
+
 ## Purpose
 
 Replace Emojizzle’s browser-only player identity with a lightweight, recoverable identity that still feels like **no account and no login** to the player.
@@ -23,7 +31,7 @@ This is **not** a conventional account system. There are no passwords, usernames
 3. Multiple devices should map to the same immutable `playerId`.
 4. Each device should receive its own revocable credential rather than sharing one permanent player token across all devices.
 5. A Daily puzzle already started on one device should resume from the same server-side attempt on another device.
-6. Existing attributable play data and feedback must remain associated with the same player.
+6. New attributable play data and feedback must remain associated with the same player across recovered sessions.
 7. The interaction should continue to feel substantially lighter than creating an account.
 8. Identity failures must become diagnosable. Do not silently erase identity merely because an authenticated API call returns a generic `401`.
 
@@ -399,82 +407,19 @@ Never put the token into:
 
 # Existing v1 identity migration
 
-Existing browsers currently hold:
-
-```ts
-{
-  playerId,
-  displayName,
-  token
-}
-```
-
-Do not simply invalidate all existing players on deployment.
-
-Provide a transition endpoint or compatible credential-verification path that allows an existing valid v1 player token to create a v2 device session.
-
-Example:
-
-```text
-POST /api/player-sessions/migrate
-```
-
-Input supplied through the existing player credential headers.
-
-If the old token is valid:
-
-1. create a new PlayerSession;
-2. return `sessionId` + new raw token;
-3. save `v2` identity locally;
-4. remove the `v1` local identity;
-5. do not alter the player ID or historical play attribution.
-
-The old Player `tokenHash` may remain temporarily during migration.
-
-Document a later cleanup strategy, but do not require a destructive production migration for this feature.
+The approved rollout resets disposable player data while retaining `PuzzleCatalog`, so no v1 credential migration endpoint is required. The client discards the old v1 local identity and starts the verified create/recover flow.
 
 ---
 
 # Existing players without recovery email
 
-Existing players predate recoverability.
-
-When an existing v1 identity is successfully migrated and no verified recovery email is associated with that player, give the player a lightweight opportunity to protect the name.
-
-For example, after gameplay or at an unobtrusive point:
-
-> Keep Mark on any device  
-> Add an email so you can recover your player name.
-
-Do not block an already-recognized legacy player from playing solely because this historical account lacks recovery information.
-
-However:
-
-- all **new** players should become recoverable;
-- existing recognized players should be encouraged to add recovery;
-- once recovery is verified, the same player can be restored anywhere.
+No legacy players are retained at rollout. Every player created after the reset verifies a recovery email before the durable player record and name reservation are created.
 
 ---
 
 # Orphaned names such as Mark / Mark2 / Mark5
 
-The system already contains player identities that may represent the same human because lost browser identity caused repeated name creation.
-
-Do **not** attempt automatic player merging in this feature.
-
-Add a safe admin-only/manual migration capability or documented data operation capable of:
-
-1. identifying the desired canonical player;
-2. linking recovery email to that player;
-3. optionally renaming the canonical player;
-4. optionally retiring an accidentally duplicated player-name reservation;
-5. preserving historical plays/feedback unless deliberately reassigned.
-
-Automatic reassignment of historical data is not required.
-
-For the immediate Mark scenario, it should be possible for an administrator to make `Mark` usable by the intended existing player without direct raw Azure table editing.
-
-If a full admin UI is disproportionate, provide a carefully documented admin API/script.
+The one-time player-data reset removes these disposable test identities and their name reservations. No merge or duplicate-cleanup feature is required.
 
 ---
 
@@ -714,23 +659,6 @@ Confirmation:
 
 Successful create/recovery returns a new device session identity.
 
-## Existing-player recovery-email enrollment
-
-```text
-POST /api/players/recovery-email
-POST /api/players/recovery-email/confirm
-```
-
-Must require an already valid player session.
-
-## Session migration
-
-```text
-POST /api/player-sessions/migrate
-```
-
-Used to convert a valid v1 browser credential to v2.
-
 ## Daily attempt lookup/start
 
 Either:
@@ -961,21 +889,7 @@ Do not implement in this branch:
 
 # Migration compatibility
 
-Production already contains:
-
-- PlayerDirectory rows;
-- name reservations;
-- player `tokenHash`;
-- PuzzlePlay rows;
-- attributed feedback.
-
-No existing player IDs should change.
-
-No existing PuzzlePlay partitioning or attribution should be discarded simply to implement sessions.
-
-Prefer additive migration.
-
-The system must continue reading legacy Player records during transition.
+The rollout deliberately resets `PlayerDirectory`, `PuzzlePlays`, `PuzzleFeedback`, and `PlayerVerifications`. `PuzzleCatalog` is retained. The reset is an explicit operator command and is never part of recurring deployment.
 
 ---
 
@@ -984,21 +898,19 @@ The system must continue reading legacy Player records during transition.
 1. Re-read current repository guidance and identity/play implementation before editing.
 2. Add an architecture note/tests for the distinction: `Player != PlayerSession`.
 3. Add PlayerSession storage and credential verification.
-4. Add v1 → v2 session migration.
-5. Update authenticated gameplay endpoints to accept v2 sessions while preserving temporary v1 compatibility.
+4. Update authenticated gameplay endpoints to accept v2 sessions.
 6. Add verification-challenge model/storage.
 7. Add email sender abstraction and test/local implementation.
 8. Add Azure Communication Services Email production integration and infrastructure/configuration.
 9. Implement new-player email verification without permanently consuming abandoned names.
-10. Implement existing-player recovery-email enrollment.
-11. Implement “I already play Emojizzle” recovery flow.
-12. Change credential-invalid handling so invalid session does not immediately become “choose another player name.”
-13. Make Daily attempts canonical per `playerId + Daily puzzle`.
-14. Implement Daily cross-device resume.
-15. Add/admin document legacy duplicate-name cleanup support.
-16. Update `/startover` semantics.
-17. Update repository documentation.
-18. Run all tests/build/lint and production-oriented smoke tests.
+10. Implement “I already play Emojizzle” recovery flow.
+11. Change credential-invalid handling so invalid session does not immediately become “choose another player name.”
+12. Make Daily attempts canonical per `playerId + Daily puzzle`.
+13. Implement Daily cross-device resume.
+14. Add the explicit player-data reset command.
+15. Update `/startover` semantics.
+16. Update repository documentation.
+17. Run all tests/build/lint and production-oriented smoke tests.
 
 ---
 
@@ -1014,7 +926,6 @@ Add focused coverage for at least:
 - session belongs to correct player;
 - multiple sessions may coexist for one player;
 - invalidating one session does not invalidate another;
-- v1 credential migration;
 - existing player ID remains unchanged.
 
 ## Verification
@@ -1055,9 +966,6 @@ Add focused coverage for at least:
 
 ## Compatibility
 
-- legacy Player rows remain readable;
-- historical plays remain attributed;
-- historical feedback remains readable;
 - Practice remains ranking-ineligible;
 - existing answer secrecy tests still pass.
 
@@ -1107,15 +1015,6 @@ Add focused coverage for at least:
 2. Reopen/play.
 3. Confirm UX offers recovery for known player rather than immediately erasing identity and forcing another name.
 
-## Legacy
-
-1. Use a browser containing valid v1 identity.
-2. Deploy feature.
-3. Open Emojizzle.
-4. Confirm transparent migration to v2.
-5. Confirm same `playerId`.
-6. Confirm existing Daily/feedback history remains attached.
-
 ## Start Over
 
 1. Use a player with two device sessions.
@@ -1136,10 +1035,9 @@ The feature is complete when:
 - A recovered player receives the same immutable `playerId`.
 - Multiple devices may simultaneously represent the same player.
 - Every device uses an independent token/session.
-- Existing legacy browser identities migrate without changing player attribution.
 - Daily play begun on one device resumes on another.
 - A second device cannot create a second ranking-eligible Daily attempt for the same player/puzzle.
-- Existing puzzle play and feedback data remain intact.
+- New puzzle play and feedback data remain correctly attributed across sessions.
 - Invalid device credentials lead toward recovery rather than duplicate-name creation.
 - The cause of credential failures is diagnosable without logging secrets.
 - Verification email is rate limited and resistant to address enumeration.

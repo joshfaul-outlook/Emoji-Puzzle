@@ -43,10 +43,10 @@ function memoryStorage(entries = {}) {
 }
 
 test("persists only valid versioned player identities and builds credential headers", () => {
-  const identity = { playerId: "123e4567-e89b-42d3-a456-426614174000", displayName: "Puzzle Dad", token: "a".repeat(43) };
+  const identity = { playerId: "123e4567-e89b-42d3-a456-426614174000", displayName: "Puzzle Dad", sessionId: "223e4567-e89b-42d3-a456-426614174000", token: "a".repeat(43) };
   const storage = memoryStorage(); savePlayerIdentity(storage, identity);
   assert.deepEqual(readPlayerIdentity(storage), identity);
-  assert.deepEqual(playerHeaders(identity), { "x-emojizzle-player-id": identity.playerId, "x-emojizzle-player-token": identity.token });
+  assert.deepEqual(playerHeaders(identity), { "x-emojizzle-player-id": identity.playerId, "x-emojizzle-player-session-id": identity.sessionId, "x-emojizzle-player-token": identity.token });
   assert.equal(normalizePlayerName("  PUZZLE   Dad ")?.normalizedDisplayName, "puzzle dad");
   assert.equal(readPlayerIdentity(memoryStorage({ [PLAYER_IDENTITY_KEY]: "broken" })), null);
 });
@@ -280,6 +280,8 @@ test("keeps answers and credentials out of public payloads and includes the iden
   assert.doesNotMatch(client, /PRACTICE \$\{puzzle\.sequenceNumber\}/);
   assert.match(api, /anonymousSessionId/);
   assert.match(api, /players\/availability/);
+  assert.match(api, /player-verifications\/confirm/);
+  assert.match(api, /player-sessions\/current/);
   assert.match(api, /plays\/start/);
   assert.match(api, /authenticatedPlayer/);
   assert.match(api, /pool === "practice" && comment !== null/);
@@ -287,6 +289,7 @@ test("keeps answers and credentials out of public payloads and includes the iden
   assert.match(storage, /PuzzleFeedback/);
   assert.match(storage, /PlayerDirectory/);
   assert.match(storage, /PuzzlePlays/);
+  assert.match(storage, /PlayerVerifications/);
   assert.doesNotMatch(storage, /guess(?:Text|Value|Candidate)/i);
   assert.match(storage, /etag/);
   assert.match(admin, /New puzzle/);

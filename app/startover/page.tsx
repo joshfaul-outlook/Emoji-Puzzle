@@ -2,20 +2,27 @@
 
 import { useEffect } from "react";
 import { KnowingMark } from "../components/KnowingMark";
+import { playerHeaders, readPlayerIdentity } from "../../lib/player-identity";
 
 export default function StartOver() {
   useEffect(() => {
-    localStorage.clear();
-    sessionStorage.clear();
-
-    for (const cookie of document.cookie.split(";")) {
-      const name = cookie.split("=")[0]?.trim();
-      if (name) {
-        document.cookie = `${name}=; Max-Age=0; path=/; SameSite=Lax`;
+    const reset = async () => {
+      const identity = readPlayerIdentity(localStorage);
+      if (identity) {
+        const request = fetch("/api/player-sessions/current", { method: "DELETE", headers: playerHeaders(identity), keepalive: true }).catch(() => undefined);
+        await Promise.race([request, new Promise((resolve) => window.setTimeout(resolve, 1_500))]);
       }
-    }
+      localStorage.clear();
+      sessionStorage.clear();
 
-    window.location.replace("/");
+      for (const cookie of document.cookie.split(";")) {
+        const name = cookie.split("=")[0]?.trim();
+        if (name) document.cookie = `${name}=; Max-Age=0; path=/; SameSite=Lax`;
+      }
+
+      window.location.replace("/");
+    };
+    void reset();
   }, []);
 
   return (

@@ -10,11 +10,15 @@ param adminPassword string
 @secure()
 param adminSessionSecret string
 @secure()
+param playerRecoveryHmacSecret string
+@secure()
 param openAiApiKey string = ''
-@description('Email that receives the $1 monthly budget alert.')
+@description('Email that receives the monthly budget alert.')
 param budgetEmail string
 @description('Production custom hostname. Set to an empty string only to use the generated Azure hostname.')
 param customDomain string = 'emojizzle.com'
+param emailDomain string = 'auth.emojizzle.com'
+param emailDomainReady bool = false
 @description('First day of the current month, generated at deployment time.')
 param budgetStartDate string = utcNow('yyyy-MM-01')
 
@@ -31,8 +35,11 @@ module production './resources.bicep' = {
     appName: appName
     adminPassword: adminPassword
     adminSessionSecret: adminSessionSecret
+    playerRecoveryHmacSecret: playerRecoveryHmacSecret
     openAiApiKey: openAiApiKey
     customDomain: customDomain
+    emailDomain: emailDomain
+    emailDomainReady: emailDomainReady
   }
 }
 
@@ -40,7 +47,7 @@ resource budget 'Microsoft.Consumption/budgets@2023-11-01' = {
   name: 'emoji-daily-monthly-budget'
   properties: {
     category: 'Cost'
-    amount: 1
+    amount: 5
     timeGrain: 'Monthly'
     timePeriod: {
       startDate: budgetStartDate

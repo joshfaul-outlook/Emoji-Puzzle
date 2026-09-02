@@ -4,7 +4,7 @@ import { isAcceptedGuess, normalizeGuess, validatePuzzle } from "../src/model.ts
 import { adminConfigured, createSessionCookie, isAdmin, originAllowed, passwordAccepted } from "../src/auth.ts";
 import { moveInCatalog, positionsForOrder } from "../src/ordering.ts";
 import { suggestPuzzle } from "../src/suggestions.ts";
-import { createPlayerToken, hashPlayerToken, isRankingEligiblePlay, normalizePlayerName, playerTokenMatches } from "../src/player-identity.ts";
+import { createPlayerToken, createVerificationCode, hashPlayerToken, hashVerificationCode, isRankingEligiblePlay, normalizePlayerName, normalizeRecoveryEmail, playerTokenMatches, recoveryEmailKey, verificationCodeMatches } from "../src/player-identity.ts";
 
 const puzzle = { answer: "Vincent van Gogh", acceptedAnswers: ["Vincent van Gogh", "Van Gogh"], pool: "daily", emoji: "🎨 🌻 👂", category: "Person", explanation: "A painter represented by sunflowers and his famous injured ear.", hints: ["Person", "Painter", "The ear"], status: "published" };
 
@@ -27,6 +27,18 @@ test("hashes browser credentials and rejects altered tokens", () => {
   assert.equal(playerTokenMatches(token, hash), true);
   assert.equal(playerTokenMatches(`${token.slice(0, -1)}${token.endsWith("a") ? "b" : "a"}`, hash), false);
   assert.equal(playerTokenMatches("short", hash), false);
+});
+
+test("normalizes recovery email and protects lookup keys and verification codes", () => {
+  process.env.PLAYER_RECOVERY_HMAC_SECRET = "test-recovery-secret-with-at-least-32-characters";
+  assert.equal(normalizeRecoveryEmail("  Mark@Example.COM "), "mark@example.com");
+  assert.equal(normalizeRecoveryEmail("not-an-email"), null);
+  assert.equal(recoveryEmailKey("mark@example.com").length, 64);
+  const challengeId = "123e4567-e89b-42d3-a456-426614174000"; const code = createVerificationCode();
+  assert.match(code, /^\d{6}$/);
+  const hash = hashVerificationCode(challengeId, code);
+  assert.notEqual(hash, code); assert.equal(verificationCodeMatches(challengeId, code, hash), true); assert.equal(verificationCodeMatches(challengeId, "000000", hash), code === "000000");
+  delete process.env.PLAYER_RECOVERY_HMAC_SECRET;
 });
 
 test("marks only the current ordinary Daily context ranking eligible", () => {

@@ -91,13 +91,19 @@ jobs:
         env:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           ADMIN_SESSION_SECRET: ${{ secrets.ADMIN_SESSION_SECRET }}
+          PLAYER_RECOVERY_HMAC_SECRET: ${{ secrets.PLAYER_RECOVERY_HMAC_SECRET }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          EMAIL_DOMAIN_READY: ${{ vars.ACS_EMAIL_DOMAIN_READY || 'false' }}
         run: |
+          if [[ "$EMAIL_DOMAIN_READY" != "true" ]]; then
+            echo "ACS email domain must be verified and ACS_EMAIL_DOMAIN_READY must be true before releasing recoverable identity." >&2
+            exit 1
+          fi
           az deployment group create \
             --name emoji-daily-production \
             --resource-group "$RESOURCE_GROUP" \
             --template-file infra/resources.bicep \
-            --parameters location=eastus2 appName="$APP_NAME" adminPassword="$ADMIN_PASSWORD" adminSessionSecret="$ADMIN_SESSION_SECRET" openAiApiKey="$OPENAI_API_KEY" customDomain=emojizzle.com \
+            --parameters location=eastus2 appName="$APP_NAME" adminPassword="$ADMIN_PASSWORD" adminSessionSecret="$ADMIN_SESSION_SECRET" playerRecoveryHmacSecret="$PLAYER_RECOVERY_HMAC_SECRET" openAiApiKey="$OPENAI_API_KEY" customDomain=emojizzle.com emailDomain=auth.emojizzle.com emailDomainReady="$EMAIL_DOMAIN_READY" \
             --output none
           site_name="$(az deployment group show --name emoji-daily-production --resource-group "$RESOURCE_GROUP" --query properties.outputs.staticWebAppName.value --output tsv)"
           storage_name="$(az deployment group show --name emoji-daily-production --resource-group "$RESOURCE_GROUP" --query properties.outputs.storageAccountName.value --output tsv)"

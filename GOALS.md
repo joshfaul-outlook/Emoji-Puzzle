@@ -31,7 +31,7 @@ The MVP exists to test that hypothesis, not to prove a complete business model.
 
 - One new puzzle each day.
 - The same puzzle for everyone.
-- No sign-up, login, feed, or busywork; a browser-local display name identifies results on that installation.
+- No password, conventional sign-up, feed, or busywork; a verified email lets a player keep one display name and continue on another device.
 - Unlimited guesses and optional help.
 - A satisfying explanation whether solved or revealed.
 - An optional Practice mode for playing several separate, ranking-ineligible puzzles at a time.
@@ -62,7 +62,7 @@ The 350-puzzle seed inventory intentionally covers literal translation, idioms, 
 
 This starting point does not attempt to build:
 
-- accounts, public profiles, login, recovery, or cross-device identity/progress;
+- passwords, conventional accounts, public profiles, or generalized cross-device Practice synchronization;
 - monetization or subscriptions;
 - social feeds, comments, or competitive leaderboards;
 - player-facing accounts or social content management;
