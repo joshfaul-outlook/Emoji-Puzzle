@@ -62,22 +62,13 @@ resource playerVerifications 'Microsoft.Storage/storageAccounts/tableServices/ta
   name: 'PlayerVerifications'
 }
 
-resource emailService 'Microsoft.Communication/emailServices@2025-09-01' = {
+resource emailService 'Microsoft.Communication/emailServices@2025-09-01' existing = {
   name: '${appName}-email'
-  location: 'global'
-  properties: {
-    dataLocation: 'United States'
-  }
 }
 
-resource playerEmailDomain 'Microsoft.Communication/emailServices/domains@2025-09-01' = {
+resource playerEmailDomain 'Microsoft.Communication/emailServices/domains@2025-09-01' existing = {
   parent: emailService
   name: emailDomain
-  location: 'global'
-  properties: {
-    domainManagement: 'CustomerManaged'
-    userEngagementTracking: 'Disabled'
-  }
 }
 
 resource playerEmailSender 'Microsoft.Communication/emailServices/domains/senderUsernames@2025-09-01' = if (emailDomainReady) {

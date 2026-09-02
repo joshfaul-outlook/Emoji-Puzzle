@@ -2,7 +2,7 @@
 
 ## Production resources
 
-`infra/main.bicep` deploys the `emoji-daily-prod-rg` resource group in `eastus2`, a Free Static Web App, a dedicated Standard LRS storage account, the `PuzzleCatalog`, `PuzzleFeedback`, `PlayerDirectory`, `PlayerVerifications`, and `PuzzlePlays` tables, Azure Communication Services Email, encrypted application settings, and a $5 subscription budget alert. Storage names receive a deterministic unique suffix.
+`infra/main.bicep` deploys the `emoji-daily-prod-rg` resource group in `eastus2`, a Free Static Web App, a dedicated Standard LRS storage account, the `PuzzleCatalog`, `PuzzleFeedback`, `PlayerDirectory`, `PlayerVerifications`, and `PuzzlePlays` tables, encrypted application settings, and a $5 subscription budget alert. `infra/email-bootstrap.bicep` creates the Azure Communication Services Email resources once; recurring deployments link but never rewrite the verified custom-domain resource. Storage names receive a deterministic unique suffix.
 
 Before provisioning, confirm the active Azure tenant and subscription. The deployment requires a budget notification email, `ADMIN_PASSWORD`, a random `ADMIN_SESSION_SECRET`, and a separate random `PLAYER_RECOVERY_HMAC_SECRET`; both secrets must contain at least 32 characters. Do not commit any of these values.
 
@@ -44,7 +44,7 @@ Deploy and verify the generated `azurestaticapps.net` hostname first. The Bicep 
 
 Verification mail uses the dedicated `auth.emojizzle.com` sending subdomain and `Emojizzle <players@auth.emojizzle.com>`. Roll it out in two stages:
 
-1. Manually deploy only `infra/resources.bicep` with `emailDomainReady=false` to create the Email Communication Service and custom-domain resource. Do not run the application release workflow yet, because verification delivery is unavailable until the domain is linked.
+1. Manually deploy `infra/email-bootstrap.bicep` into the production resource group to create the Email Communication Service, custom-domain resource, and unlinked Communication Service. Do not run the application release workflow yet, because verification delivery is unavailable until the domain is linked. The bootstrap template must not be rerun after verification; recurring deployment treats the verified domain as an existing resource so its verification state is preserved.
 2. In Azure, copy the generated ownership, SPF, and DKIM values into the DNS zone for `auth.emojizzle.com`. Add a DMARC policy for the subdomain and wait for Azure to report the domain fully verified.
 3. Set the protected GitHub environment variable `ACS_EMAIL_DOMAIN_READY=true` and deploy again. This creates the `players` sender username and links the verified domain to the Communication Services resource.
 4. Send a real verification code to an address outside the project domain and inspect delivery plus SPF, DKIM, and DMARC results before announcing the flow.
