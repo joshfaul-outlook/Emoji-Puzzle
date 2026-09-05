@@ -26,7 +26,9 @@ Azure Table Storage is the production source of truth for puzzles, player-name r
 
 Implemented [Player Rankings and Private Stats](docs/PLAYER_RANKINGS_FEATURE_PLAN.md): private Daily/Practice summaries, current/best Daily streaks, public Daily rankings, and a default-on public preference with opt-out. Deployment initializes an immutable, nonrepeating Daily schedule and rankings epoch; legacy/test results are excluded. The public board uses a persisted snapshot refreshed on demand at most every five minutes, matching the managed Azure HTTP-only API.
 
-The first Daily request after deployment stores the rankings launch date and freezes that day's assignment. Later deployments reuse the persisted epoch. No separate launch-date setting or production data reset is required.
+The next refinement is documented in [Rankings Display and Fresh-Start Plan](docs/RANKINGS_DISPLAY_REFINEMENT_PLAN.md): contextual at-a-glance progress on play views, strictly separated Daily/Rankings/Practice detail views, and a one-time clean restart of game history and the Daily schedule while retaining verified player identities.
+
+The first Daily request after deployment stores the rankings launch date and freezes that day's assignment. Later routine deployments reuse the persisted epoch. The planned one-time fresh start deliberately replaces that epoch through the scoped operator reset; it does not add a recurring launch-date setting.
 
 ## Deferred work
 

@@ -1,0 +1,485 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;700;800&family=Sora:wght@700&display=swap');
+
+#emojizzle-rankings-preview {
+  --emoji-ivory: light-dark(#f5f4ef, #202528);
+  --emoji-surface: light-dark(#fffdfa, #2b3135);
+  --emoji-muted-surface: light-dark(#eceae5, #353c40);
+  --emoji-ink: light-dark(#2f3437, #f5f4ef);
+  --emoji-muted: light-dark(#697075, #b6bec2);
+  --emoji-line: light-dark(#d9d8d3, #485156);
+  --emoji-slate: light-dark(#556b80, #9ab1c7);
+  --emoji-slate-dark: light-dark(#405365, #c1d1df);
+  --emoji-mist: light-dark(#e3efed, #294541);
+  --emoji-gold: light-dark(#d6b46a, #e1bf76);
+  --emoji-gold-soft: light-dark(#f4ebd8, #4b402d);
+  --emoji-danger: light-dark(#a45652, #e59791);
+  width: 100%;
+  color: var(--emoji-ink);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+#emojizzle-rankings-preview * { box-sizing: border-box; }
+#emojizzle-rankings-preview button,
+#emojizzle-rankings-preview select { font: inherit; color: inherit; }
+#emojizzle-rankings-preview button { cursor: pointer; }
+
+#emojizzle-rankings-preview .emoji-preview-frame {
+  width: min(100%, 720px);
+  margin: 0 auto;
+  border-radius: 26px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--emoji-mist) 72%, transparent), transparent 35%),
+    var(--emoji-ivory);
+  box-shadow: 0 22px 70px color-mix(in srgb, var(--emoji-ink) 16%, transparent);
+}
+
+#emojizzle-rankings-preview .emoji-app {
+  min-height: 760px;
+  padding: 0 clamp(14px, 4vw, 24px) 30px;
+}
+
+#emojizzle-rankings-preview .emoji-topbar {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--emoji-line) 70%, transparent);
+}
+
+#emojizzle-rankings-preview .emoji-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font-family: Sora, sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+#emojizzle-rankings-preview .emoji-mark {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--emoji-slate);
+  color: var(--emoji-ivory);
+  font-size: 20px;
+}
+
+#emojizzle-rankings-preview .emoji-top-actions { display: flex; align-items: center; gap: 8px; }
+#emojizzle-rankings-preview .emoji-quiet-action,
+#emojizzle-rankings-preview .emoji-player {
+  min-height: 38px;
+  border: 1px solid var(--emoji-line);
+  border-radius: 999px;
+  padding: 0 11px;
+  background: color-mix(in srgb, var(--emoji-surface) 76%, transparent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+#emojizzle-rankings-preview .emoji-mode-switch {
+  width: min(100%, 320px);
+  margin: 20px auto 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  padding: 5px;
+  border-radius: 14px;
+  background: var(--emoji-muted-surface);
+}
+
+#emojizzle-rankings-preview .emoji-mode-switch button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  font-weight: 800;
+}
+
+#emojizzle-rankings-preview .emoji-mode-switch button[aria-pressed="true"] {
+  background: var(--emoji-slate);
+  color: var(--emoji-ivory);
+}
+
+#emojizzle-rankings-preview .emoji-glance {
+  width: min(100%, 440px);
+  min-height: 46px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 13px;
+  padding: 7px 9px 7px 13px;
+  background: color-mix(in srgb, var(--emoji-mist) 78%, var(--emoji-surface));
+  text-align: left;
+}
+
+#emojizzle-rankings-preview .emoji-glance.metric-sentence {
+  grid-template-columns: 1fr auto;
+}
+
+#emojizzle-rankings-preview .emoji-glance-item { min-width: 0; display: flex; align-items: center; gap: 7px; }
+#emojizzle-rankings-preview .emoji-glance-icon { font-size: 17px; }
+#emojizzle-rankings-preview .emoji-glance-copy { min-width: 0; display: grid; gap: 1px; }
+#emojizzle-rankings-preview .emoji-glance-copy strong { font-size: 13px; white-space: nowrap; }
+#emojizzle-rankings-preview .emoji-glance-copy small { color: var(--emoji-muted); font-size: 11px; white-space: nowrap; }
+#emojizzle-rankings-preview .emoji-glance-arrow {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--emoji-surface) 84%, transparent);
+  color: var(--emoji-slate-dark);
+  font-size: 18px;
+}
+
+#emojizzle-rankings-preview .emoji-puzzle-card {
+  position: relative;
+  margin-top: 28px;
+  border: 1px solid var(--emoji-line);
+  border-radius: 26px;
+  padding: 28px clamp(16px, 5vw, 32px) 30px;
+  background: color-mix(in srgb, var(--emoji-surface) 93%, transparent);
+  box-shadow: 0 12px 34px color-mix(in srgb, var(--emoji-ink) 7%, transparent);
+  text-align: center;
+}
+
+#emojizzle-rankings-preview .emoji-day-pill {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  padding: 6px 11px;
+  background: var(--emoji-gold-soft);
+  color: var(--emoji-slate-dark);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+#emojizzle-rankings-preview .emoji-eyebrow {
+  margin-top: 8px;
+  color: var(--emoji-slate-dark);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+#emojizzle-rankings-preview .emoji-puzzle-card h1 {
+  margin: 9px 0;
+  font-family: Fraunces, Georgia, serif;
+  font-size: clamp(31px, 7vw, 44px);
+  line-height: 1.05;
+}
+
+#emojizzle-rankings-preview .emoji-intro { margin: 0 auto; max-width: 440px; color: var(--emoji-muted); font-size: 14px; line-height: 1.5; }
+#emojizzle-rankings-preview .emoji-clue { margin: 46px 0; font-size: clamp(48px, 12vw, 68px); letter-spacing: .08em; }
+#emojizzle-rankings-preview .emoji-guess-row { display: grid; grid-template-columns: 1fr auto; gap: 9px; }
+#emojizzle-rankings-preview .emoji-guess-row input {
+  min-width: 0;
+  min-height: 50px;
+  border: 1px solid var(--emoji-line);
+  border-radius: 12px;
+  padding: 0 14px;
+  background: var(--emoji-surface);
+  color: var(--emoji-ink);
+  font: inherit;
+  font-size: 16px;
+}
+#emojizzle-rankings-preview .emoji-guess-row button {
+  min-height: 50px;
+  border: 0;
+  border-radius: 12px;
+  padding: 0 20px;
+  background: var(--emoji-slate);
+  color: var(--emoji-ivory);
+  font-weight: 800;
+}
+#emojizzle-rankings-preview .emoji-help-row { margin-top: 20px; display: flex; justify-content: space-between; gap: 12px; }
+#emojizzle-rankings-preview .emoji-help-row button { min-height: 44px; border: 0; background: transparent; color: var(--emoji-slate-dark); font-weight: 700; }
+
+#emojizzle-rankings-preview .emoji-modal-shell { display: none; padding: 12px; background: color-mix(in srgb, var(--emoji-slate) 36%, transparent); }
+#emojizzle-rankings-preview[data-open="true"] .emoji-app { display: none; }
+#emojizzle-rankings-preview[data-open="true"] .emoji-modal-shell { display: block; }
+
+#emojizzle-rankings-preview .emoji-dialog {
+  width: 100%;
+  min-height: 760px;
+  border: 1px solid var(--emoji-line);
+  border-radius: 20px;
+  padding: clamp(17px, 4vw, 28px);
+  background: var(--emoji-surface);
+  box-shadow: 0 24px 80px color-mix(in srgb, var(--emoji-ink) 24%, transparent);
+}
+
+#emojizzle-rankings-preview .emoji-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#emojizzle-rankings-preview .emoji-dialog-heading p { margin: 0 0 4px; color: var(--emoji-muted); font-size: 12px; }
+#emojizzle-rankings-preview .emoji-dialog-heading h2 { margin: 0; font-family: Fraunces, Georgia, serif; font-size: clamp(27px, 6vw, 34px); }
+#emojizzle-rankings-preview .emoji-close { width: 44px; height: 44px; border: 1px solid var(--emoji-line); border-radius: 50%; background: var(--emoji-surface); font-size: 21px; }
+
+#emojizzle-rankings-preview .emoji-stats-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin: 22px 0;
+  padding: 5px;
+  border-radius: 12px;
+  background: var(--emoji-muted-surface);
+}
+#emojizzle-rankings-preview .emoji-stats-tabs button { min-height: 44px; border: 0; border-radius: 8px; background: transparent; font-weight: 800; }
+#emojizzle-rankings-preview .emoji-stats-tabs button[aria-selected="true"] { background: var(--emoji-surface); color: var(--emoji-slate-dark); box-shadow: 0 4px 14px color-mix(in srgb, var(--emoji-ink) 10%, transparent); }
+
+#emojizzle-rankings-preview .emoji-panel[hidden] { display: none; }
+#emojizzle-rankings-preview .emoji-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+#emojizzle-rankings-preview .emoji-panel-header h3 { margin: 0; font-size: 18px; }
+#emojizzle-rankings-preview .emoji-panel-header select { min-height: 42px; border: 1px solid var(--emoji-line); border-radius: 10px; padding: 0 9px; background: var(--emoji-surface); font-size: 13px; }
+
+#emojizzle-rankings-preview .emoji-feature-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+#emojizzle-rankings-preview .emoji-feature {
+  min-width: 0;
+  border-radius: 14px;
+  padding: 16px 10px;
+  background: var(--emoji-mist);
+  text-align: center;
+}
+#emojizzle-rankings-preview .emoji-feature.gold { background: var(--emoji-gold-soft); }
+#emojizzle-rankings-preview .emoji-feature strong { display: block; color: var(--emoji-slate-dark); font-size: 30px; line-height: 1.1; }
+#emojizzle-rankings-preview .emoji-feature span { display: block; margin-top: 5px; color: var(--emoji-muted); font-size: 11px; }
+
+#emojizzle-rankings-preview .emoji-section-title { margin: 24px 0 12px; padding-top: 18px; border-top: 1px solid var(--emoji-line); font-size: 17px; }
+#emojizzle-rankings-preview .emoji-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin: 0; }
+#emojizzle-rankings-preview .emoji-metrics div { border-radius: 10px; padding: 12px 9px; background: var(--emoji-ivory); }
+#emojizzle-rankings-preview .emoji-metrics dt { color: var(--emoji-muted); font-size: 11px; }
+#emojizzle-rankings-preview .emoji-metrics dd { margin: 5px 0 0; font-size: 22px; font-weight: 800; }
+#emojizzle-rankings-preview .emoji-note { color: var(--emoji-muted); font-size: 12px; line-height: 1.5; }
+
+#emojizzle-rankings-preview .emoji-rank-callout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 18px;
+  border-radius: 13px;
+  padding: 14px;
+  background: var(--emoji-gold-soft);
+}
+#emojizzle-rankings-preview .emoji-rank-callout strong { font-size: 28px; color: var(--emoji-slate-dark); }
+#emojizzle-rankings-preview .emoji-rank-callout span { display: block; font-size: 13px; font-weight: 800; }
+#emojizzle-rankings-preview .emoji-rank-callout small { color: var(--emoji-muted); font-size: 11px; }
+
+#emojizzle-rankings-preview .emoji-board { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+#emojizzle-rankings-preview .emoji-board caption { padding: 8px 0 10px; text-align: left; font-weight: 800; }
+#emojizzle-rankings-preview .emoji-board th,
+#emojizzle-rankings-preview .emoji-board td { padding: 11px 4px; border-bottom: 1px solid var(--emoji-line); text-align: center; overflow-wrap: anywhere; }
+#emojizzle-rankings-preview .emoji-board th:nth-child(2) { width: 32%; text-align: left; }
+#emojizzle-rankings-preview .emoji-board thead th { color: var(--emoji-muted); font-size: 10px; white-space: nowrap; }
+
+#emojizzle-rankings-preview .emoji-practice-banner { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+#emojizzle-rankings-preview .emoji-practice-banner strong { font-size: 34px; color: var(--emoji-slate-dark); }
+#emojizzle-rankings-preview .emoji-practice-banner span { display: block; font-size: 13px; font-weight: 800; }
+#emojizzle-rankings-preview .emoji-practice-banner small { color: var(--emoji-muted); font-size: 11px; }
+
+@media (max-width: 520px) {
+  #emojizzle-rankings-preview .emoji-preview-frame { border-radius: 18px; }
+  #emojizzle-rankings-preview .emoji-app { min-height: 710px; }
+  #emojizzle-rankings-preview .emoji-topbar { min-height: 64px; }
+  #emojizzle-rankings-preview .emoji-quiet-action { display: none; }
+  #emojizzle-rankings-preview .emoji-brand { font-size: 16px; }
+  #emojizzle-rankings-preview .emoji-player { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #emojizzle-rankings-preview .emoji-glance { grid-template-columns: 1fr 1fr auto; padding-left: 10px; }
+  #emojizzle-rankings-preview .emoji-glance-copy small { display: none; }
+  #emojizzle-rankings-preview .emoji-puzzle-card { margin-top: 25px; padding-inline: 14px; }
+  #emojizzle-rankings-preview .emoji-clue { margin: 38px 0; }
+  #emojizzle-rankings-preview .emoji-guess-row { grid-template-columns: 1fr; }
+  #emojizzle-rankings-preview .emoji-feature-row { grid-template-columns: 1fr 1fr; }
+  #emojizzle-rankings-preview .emoji-feature:last-child { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  #emojizzle-rankings-preview .emoji-feature:last-child span { margin: 0; }
+  #emojizzle-rankings-preview .emoji-panel-header { align-items: flex-start; flex-direction: column; }
+  #emojizzle-rankings-preview .emoji-metrics { grid-template-columns: repeat(2, 1fr); }
+  #emojizzle-rankings-preview .emoji-board { font-size: 11px; }
+  #emojizzle-rankings-preview .emoji-board th:nth-child(2) { width: 29%; }
+}
+</style>
+
+<div id="emojizzle-rankings-preview" data-open="false" data-mode="daily" aria-label="Interactive preview of the refined Emojizzle play and stats interface">
+  <div class="emoji-preview-frame">
+    <main class="emoji-app">
+      <header class="emoji-topbar">
+        <button class="emoji-brand" type="button" aria-label="Emojizzle home">
+          <span class="emoji-mark" aria-hidden="true">?</span>
+          <span>EMOJIZZLE</span>
+        </button>
+        <div class="emoji-top-actions">
+          <button class="emoji-quiet-action" type="button">Share</button>
+          <button class="emoji-player" type="button" data-open-stats="daily">PuzzleDad&nbsp; · &nbsp;Stats</button>
+        </div>
+      </header>
+
+      <nav class="emoji-mode-switch" aria-label="Game mode">
+        <button type="button" data-mode-button="daily" aria-pressed="true">Daily</button>
+        <button type="button" data-mode-button="practice" aria-pressed="false">Practice</button>
+      </nav>
+
+      <button class="emoji-glance" type="button" data-open-stats="daily" aria-label="Open Daily stats: 4-day streak, rank 12 this month">
+        <span class="emoji-glance-item">
+          <span class="emoji-glance-icon" aria-hidden="true">🔥</span>
+          <span class="emoji-glance-copy"><strong>4-day streak</strong><small>Solve today to keep it</small></span>
+        </span>
+        <span class="emoji-glance-item">
+          <span class="emoji-glance-icon" aria-hidden="true">🏅</span>
+          <span class="emoji-glance-copy"><strong>#12 this month</strong><small>18 Daily solves</small></span>
+        </span>
+        <span class="emoji-glance-arrow" aria-hidden="true">›</span>
+      </button>
+
+      <section class="emoji-puzzle-card" aria-labelledby="emoji-preview-puzzle-title">
+        <span class="emoji-day-pill" data-day-pill>SEP 05</span>
+        <div class="emoji-eyebrow" data-puzzle-eyebrow>Today’s puzzle</div>
+        <h1 id="emoji-preview-puzzle-title">What do these mean?</h1>
+        <p class="emoji-intro">It could be a phrase, person, story—or something else entirely.</p>
+        <div class="emoji-clue" aria-label="Emoji puzzle: rain cloud, cat, dog">🌧️ 🐈 🐕</div>
+        <div class="emoji-guess-row">
+          <input aria-label="Your answer" placeholder="What does it mean?" />
+          <button type="button">Guess</button>
+        </div>
+        <div class="emoji-help-row">
+          <button type="button">✦ Need a hint? <small>0/3</small></button>
+          <button type="button">Reveal answer</button>
+        </div>
+      </section>
+    </main>
+
+    <div class="emoji-modal-shell">
+      <section class="emoji-dialog" role="dialog" aria-modal="true" aria-labelledby="emoji-preview-stats-title">
+        <div class="emoji-dialog-heading">
+          <div><p>PuzzleDad</p><h2 id="emoji-preview-stats-title">Stats &amp; rankings</h2></div>
+          <button class="emoji-close" type="button" aria-label="Close stats">×</button>
+        </div>
+
+        <div class="emoji-stats-tabs" role="tablist" aria-label="Stats view">
+          <button id="emoji-tab-daily" type="button" role="tab" aria-controls="emoji-panel-daily" aria-selected="true" data-tab="daily">Daily</button>
+          <button id="emoji-tab-rankings" type="button" role="tab" aria-controls="emoji-panel-rankings" aria-selected="false" data-tab="rankings">Rankings</button>
+          <button id="emoji-tab-practice" type="button" role="tab" aria-controls="emoji-panel-practice" aria-selected="false" data-tab="practice">Practice</button>
+        </div>
+
+        <div class="emoji-panel" id="emoji-panel-daily" role="tabpanel" aria-labelledby="emoji-tab-daily">
+          <div class="emoji-panel-header"><h3>Your Daily progress</h3><select aria-label="Daily history"><option>All recorded history</option><option>Last 30 days</option></select></div>
+          <div class="emoji-feature-row">
+            <div class="emoji-feature"><strong>4</strong><span>Current streak</span></div>
+            <div class="emoji-feature"><strong>9</strong><span>Best streak</span></div>
+            <div class="emoji-feature gold"><strong>#12</strong><span>Monthly rank</span></div>
+          </div>
+          <p class="emoji-note">Daily streaks include solves with hints and close at midnight UTC.</p>
+          <h3 class="emoji-section-title">Daily puzzles</h3>
+          <dl class="emoji-metrics">
+            <div><dt>Started</dt><dd>24</dd></div><div><dt>Solved</dt><dd>21</dd></div><div><dt>Revealed</dt><dd>2</dd></div>
+            <div><dt>Solve rate</dt><dd>91%</dd></div><div><dt>Without hints</dt><dd>14</dd></div><div><dt>Avg. guesses</dt><dd>2.3</dd></div>
+          </dl>
+          <p class="emoji-note">Your Daily totals and streak are private to you. Your player name, rank, and approved Daily totals appear publicly while rankings are enabled.</p>
+        </div>
+
+        <div class="emoji-panel" id="emoji-panel-rankings" role="tabpanel" aria-labelledby="emoji-tab-rankings" hidden>
+          <div class="emoji-panel-header"><h3>Daily leaderboard</h3><span class="emoji-note">Last 30 UTC days</span></div>
+          <div class="emoji-rank-callout"><strong>#12</strong><div><span>Your current placement</span><small>18 solves · 13 unaided · 4-day streak</small></div></div>
+          <table class="emoji-board">
+            <caption>82 ranked players</caption>
+            <thead><tr><th>Rank</th><th>Player</th><th>Solves</th><th>Unaided</th><th>Streak</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><th>EmojiAce</th><td>29</td><td>24</td><td>16</td></tr>
+              <tr><td>2</td><th>AhaMoment</th><td>28</td><td>22</td><td>9</td></tr>
+              <tr><td>3</td><th>ClueCruiser</th><td>27</td><td>23</td><td>7</td></tr>
+              <tr><td>4</td><th>RebusRiley</th><td>27</td><td>20</td><td>12</td></tr>
+              <tr><td>5</td><th>BrightIdea</th><td>26</td><td>19</td><td>5</td></tr>
+            </tbody>
+          </table>
+          <p class="emoji-note">Most Daily solves, then most without hints. Equal totals share a rank. Practice never counts. Updated 10:35 UTC.</p>
+        </div>
+
+        <div class="emoji-panel" id="emoji-panel-practice" role="tabpanel" aria-labelledby="emoji-tab-practice" hidden>
+          <div class="emoji-panel-header"><h3>Your Practice progress</h3><select aria-label="Practice history"><option>All recorded history</option><option>Last 30 days</option></select></div>
+          <div class="emoji-practice-banner"><strong>18</strong><div><span>Practice puzzles solved</span><small>Private and separate from Daily rankings</small></div></div>
+          <dl class="emoji-metrics">
+            <div><dt>Started</dt><dd>25</dd></div><div><dt>Solved</dt><dd>18</dd></div><div><dt>Revealed</dt><dd>7</dd></div>
+            <div><dt>Solve rate</dt><dd>72%</dd></div><div><dt>Avg. guesses</dt><dd>2.8</dd></div><div><dt>Avg. hints</dt><dd>1.1</dd></div>
+          </dl>
+          <p class="emoji-note">Only you can see Practice stats. They never affect your Daily rank or streak.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const root = document.getElementById('emojizzle-rankings-preview');
+  const glance = root.querySelector('.emoji-glance');
+  const dayPill = root.querySelector('[data-day-pill]');
+  const eyebrow = root.querySelector('[data-puzzle-eyebrow]');
+  const state = { mode: 'daily', stripStyle: 'paired' };
+
+  function selectTab(name) {
+    root.querySelectorAll('[data-tab]').forEach((button) => {
+      button.setAttribute('aria-selected', button.dataset.tab === name ? 'true' : 'false');
+    });
+    root.querySelectorAll('.emoji-panel').forEach((panel) => {
+      panel.hidden = panel.id !== `emoji-panel-${name}`;
+    });
+  }
+
+  function renderMode() {
+    root.dataset.mode = state.mode;
+    root.querySelectorAll('[data-mode-button]').forEach((button) => {
+      button.setAttribute('aria-pressed', button.dataset.modeButton === state.mode ? 'true' : 'false');
+    });
+    glance.classList.toggle('metric-sentence', state.stripStyle === 'sentence');
+    if (state.mode === 'daily') {
+      glance.dataset.openStats = 'daily';
+      glance.setAttribute('aria-label', 'Open Daily stats: 4-day streak, rank 12 this month');
+      glance.innerHTML = state.stripStyle === 'sentence'
+        ? '<span class="emoji-glance-item"><span class="emoji-glance-icon" aria-hidden="true">🔥</span><span class="emoji-glance-copy"><strong>Keep your 4-day streak · ranked #12</strong><small>Solve today to keep climbing</small></span></span><span class="emoji-glance-arrow" aria-hidden="true">›</span>'
+        : '<span class="emoji-glance-item"><span class="emoji-glance-icon" aria-hidden="true">🔥</span><span class="emoji-glance-copy"><strong>4-day streak</strong><small>Solve today to keep it</small></span></span><span class="emoji-glance-item"><span class="emoji-glance-icon" aria-hidden="true">🏅</span><span class="emoji-glance-copy"><strong>#12 this month</strong><small>18 Daily solves</small></span></span><span class="emoji-glance-arrow" aria-hidden="true">›</span>';
+      dayPill.hidden = false;
+      eyebrow.textContent = 'Today’s puzzle';
+    } else {
+      glance.dataset.openStats = 'practice';
+      glance.setAttribute('aria-label', 'Open Practice stats: 18 solved, 72 percent solve rate');
+      glance.innerHTML = state.stripStyle === 'sentence'
+        ? '<span class="emoji-glance-item"><span class="emoji-glance-icon" aria-hidden="true">🎯</span><span class="emoji-glance-copy"><strong>18 Practice puzzles solved</strong><small>72% solve rate</small></span></span><span class="emoji-glance-arrow" aria-hidden="true">›</span>'
+        : '<span class="emoji-glance-item"><span class="emoji-glance-icon" aria-hidden="true">🎯</span><span class="emoji-glance-copy"><strong>18 solved</strong><small>Practice only</small></span></span><span class="emoji-glance-item"><span class="emoji-glance-icon" aria-hidden="true">✨</span><span class="emoji-glance-copy"><strong>72% solve rate</strong><small>Private progress</small></span></span><span class="emoji-glance-arrow" aria-hidden="true">›</span>';
+      dayPill.hidden = true;
+      eyebrow.textContent = 'Practice puzzle';
+    }
+  }
+
+  root.querySelectorAll('[data-mode-button]').forEach((button) => {
+    button.addEventListener('click', () => { state.mode = button.dataset.modeButton; renderMode(); });
+  });
+  root.addEventListener('click', (event) => {
+    const opener = event.target.closest('[data-open-stats]');
+    if (opener) {
+      root.dataset.open = 'true';
+      selectTab(opener.dataset.openStats || state.mode);
+    }
+  });
+  root.querySelector('.emoji-close').addEventListener('click', () => { root.dataset.open = 'false'; });
+  root.querySelectorAll('[data-tab]').forEach((button) => button.addEventListener('click', () => selectTab(button.dataset.tab)));
+
+  renderMode();
+
+  if (globalThis.Tweak) {
+    const tweak = new Tweak({ container: root, onChange: renderMode });
+    tweak.addSelect(state, 'stripStyle', { label: 'Progress strip copy', options: [{ label: 'Paired metrics', value: 'paired' }, { label: 'One-line nudge', value: 'sentence' }], reference: 'progress-strip.copy' });
+  }
+})();
+</script>
