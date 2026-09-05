@@ -20,9 +20,9 @@ The emoji helper searches a bundled dataset locally. `Use suggested` replaces th
 
 ## Daily rankings rollout and operation
 
-Private stats are available from the player's **Stats** control. Public Daily stats default on, with a durable opt-out. Practice and shared challenge stats always remain private. Daily ranking order is solves over today plus the prior 29 UTC dates, then unaided solves; equal totals share ranks. Current and best Daily solve streaks use all eligible history from rankings launch.
+Private stats are available from the player's **Stats** control. Public Daily stats default on, with a durable opt-out. Practice stats remain private, and shared challenge activity is not shown in Stats. Daily ranking order is solves over today plus the prior 29 UTC dates, then unaided solves; equal totals share ranks. Current and best Daily solve streaks use all eligible history from rankings launch.
 
-Rankings activate with deployment. The workflow's production smoke test requests the current Daily puzzle, which atomically stores that UTC date as the rankings epoch and freezes the first nonrepeating assignment. Later deployments reuse the persisted epoch; there is no rankings launch-date setting to manage. Supply new authored Daily records beyond the exposed test fixture as development continues. Do not relabel exposed Practice puzzles as fresh Daily content or reset player data to create eligibility.
+Rankings activate with deployment. The workflow's production smoke test requests the current Daily puzzle, which atomically stores that UTC date as the rankings epoch and freezes the first nonrepeating assignment. Later deployments reuse the persisted epoch; there is no rankings launch-date setting to manage. Supply new authored Daily records beyond the exposed test fixture as development continues. Do not relabel exposed Practice puzzles as fresh Daily content or reset player data to create eligibility outside the approved one-time fresh-start procedure below.
 
 On the first request after deployment, the server reserves published Practice content and any puzzle with recorded Practice/challenge exposure. Predeployment Daily attempts remain private, unranked development history; the existing Daily catalog enters the authoritative schedule once from the deployment epoch. Each issued Daily date stores a frozen puzzle snapshot and an atomic puzzle reservation in `PuzzleCatalog` / `DailySchedule`. Each player retains the same canonical player + puzzle attempt, so a player who already attempted that puzzle before activation cannot turn the old result into ranking credit. Catalog edits, reordering, and archival cannot alter an already-issued puzzle. Requests to author previews require the existing admin session; preview attempts never qualify for rank.
 
@@ -53,6 +53,20 @@ TABLE_STORAGE_CONNECTION_STRING="..." npm --prefix api run reset:player-data -- 
 ```
 
 This deletes every row from exactly `PuzzleFeedback`, `PlayerDirectory`, `PuzzlePlays`, and `PlayerVerifications`; it never touches `PuzzleCatalog` or drops any table. Do not put this command into the recurring deployment workflow. After rollout, player and play tables are durable. Clearing site data leads to email recovery of the existing player rather than releasing its name.
+
+For the approved rankings-display fresh start, preserve verified identities while clearing game history. First export the affected tables and run the dry run:
+
+```bash
+TABLE_STORAGE_CONNECTION_STRING="..." npm --prefix api run reset:game-history
+```
+
+Review its counts, then apply it once:
+
+```bash
+TABLE_STORAGE_CONNECTION_STRING="..." npm --prefix api run reset:game-history -- --confirm-reset-game-history
+```
+
+This removes `PuzzlePlays`, `PuzzleFeedback`, `DailySchedule`, rankings metadata/leases, and ranking snapshot partitions. It preserves every authored puzzle/catalog-order row plus `PlayerDirectory` and `PlayerVerifications`. Run it only after deploying the matching client game-data epoch. The production smoke test creates a Daily assignment during deployment, so reset after the smoke test and immediately request the Daily endpoint once to establish the new UTC epoch and first published Daily puzzle. Verify zero personal totals, an empty public board, first-position Practice, and the expected first Daily before accepting the cutover. Never add this command to the recurring deployment workflow.
 
 ## Custom domain and SSL
 

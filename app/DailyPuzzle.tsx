@@ -11,10 +11,9 @@ import {
   ACTIVE_MODE_KEY,
   PRACTICE_PROGRESS_KEY,
   challengePlayStorageKey,
-  dailyPlayStorageKey,
   getActiveMode,
   practicePlayStorageKey,
-  restorePlay,
+  restoreOpaquePlayId,
   restorePracticeProgress,
   type PlayState,
   type PracticeProgress,
@@ -24,7 +23,7 @@ import { feedbackPlayFields } from "../lib/feedback-payload";
 import { playerHeaders, type PlayerIdentity } from "../lib/player-identity";
 import { BrandWordmark } from "./components/BrandWordmark";
 import { KnowingMark } from "./components/KnowingMark";
-import { DailyStreak, PlayerStatsPanel } from "./PlayerStats";
+import { DailyStreak, PlayerStatsPanel, ProgressStrip } from "./PlayerStats";
 
 const SESSION_KEY = "emoji-daily-anonymous-session";
 
@@ -78,6 +77,7 @@ export function DailyPuzzle({
   const [nextPuzzleCountdown, setNextPuzzleCountdown] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [statsRefresh, setStatsRefresh] = useState(0);
   const [shareState, setShareState] = useState<"idle" | "shared" | "copied" | "error">("idle");
   const [nativeSharingAvailable, setNativeSharingAvailable] = useState(false);
   const [rating, setRating] = useState<"up" | "down" | null>(null);
@@ -97,14 +97,10 @@ export function DailyPuzzle({
   useEffect(() => {
     const task = window.setTimeout(() => {
       if (puzzle.context === "daily") {
-        const dateCode = puzzle.dateCode ?? new Date().toISOString().slice(2, 10).replace(/-/g, "");
-        const nextStorageKey = dailyPlayStorageKey(puzzle.id, dateCode);
-        const legacyStorageKey = `emoji-daily-play:${puzzle.id}`;
-        const restored = restorePlay(localStorage, nextStorageKey) ?? (
-          puzzle.legacyStorageEligible ? restorePlay(localStorage, legacyStorageKey) : null
-        );
-        setPlay(restored ?? freshPlay());
-        setPlayStorageKey(nextStorageKey);
+        // Daily state is canonical on the server; browser storage must not hold
+        // guesses, hints, outcomes, resolutions, or feedback.
+        setPlay(freshPlay());
+        setPlayStorageKey("server-canonical");
       } else if (puzzle.context === "practice") {
         sessionStorage.setItem(ACTIVE_MODE_KEY, "practice");
         const progress = restorePracticeProgress(localStorage, puzzle.sequenceLength);
@@ -118,7 +114,8 @@ export function DailyPuzzle({
         localStorage.setItem(PRACTICE_PROGRESS_KEY, JSON.stringify(currentProgress));
         setPracticeProgress(currentProgress);
         const nextStorageKey = practicePlayStorageKey(puzzle.id, currentProgress.cycle);
-        setPlay(restorePlay(localStorage, nextStorageKey) ?? freshPlay());
+        const nextPlay = freshPlay();
+        setPlay({ ...nextPlay, playId: restoreOpaquePlayId(localStorage, nextStorageKey) ?? nextPlay.playId });
         setPlayStorageKey(nextStorageKey);
       } else if (puzzle.context === "challenge") {
         sessionStorage.setItem(ACTIVE_MODE_KEY, "practice");
@@ -126,11 +123,12 @@ export function DailyPuzzle({
           ? `${challengeBenchmark.outcome}-${challengeBenchmark.guessCount}-${challengeBenchmark.hintCount}`
           : "open";
         const nextStorageKey = challengePlayStorageKey(puzzle.id, challengeKey);
-        setPlay(restorePlay(localStorage, nextStorageKey) ?? freshPlay());
+        const nextPlay = freshPlay();
+        setPlay({ ...nextPlay, playId: restoreOpaquePlayId(localStorage, nextStorageKey) ?? nextPlay.playId });
         setPlayStorageKey(nextStorageKey);
       } else {
         const nextStorageKey = `emoji-daily-play:author-test:${puzzle.id}`;
-        setPlay(restorePlay(localStorage, nextStorageKey) ?? freshPlay());
+        setPlay(freshPlay());
         setPlayStorageKey(nextStorageKey);
       }
       setGuess("");
@@ -183,10 +181,10 @@ export function DailyPuzzle({
   }, [hydratedPuzzleId, identity, invalidateIdentity, play.playId, playStorageKey, puzzle.context, puzzle.id, puzzle.pool, trackingRetry]);
 
   useEffect(() => {
-    if (hydratedPuzzleId === puzzle.id && playStorageKey) {
-      localStorage.setItem(playStorageKey, JSON.stringify(play));
+    if (hydratedPuzzleId === puzzle.id && playStorageKey && puzzle.context !== "daily" && puzzle.context !== "author-test") {
+      localStorage.setItem(playStorageKey, JSON.stringify({ playId: play.playId }));
     }
-  }, [hydratedPuzzleId, play, playStorageKey, puzzle.id]);
+  }, [hydratedPuzzleId, play, playStorageKey, puzzle.context, puzzle.id]);
 
   useEffect(() => {
     if (puzzle.context !== "daily") return;
@@ -533,7 +531,7 @@ export function DailyPuzzle({
         </div>
       </header>
 
-      {statsOpen && <PlayerStatsPanel identity={identity} onClose={() => setStatsOpen(false)} />}
+      {statsOpen && <PlayerStatsPanel identity={identity} initialView={puzzle.context === "practice" ? "practice" : "daily"} onClose={() => { setStatsOpen(false); setStatsRefresh((value) => value + 1); }} />}
 
       <nav className="mode-switch" aria-label="Game mode">
         <button
@@ -553,6 +551,10 @@ export function DailyPuzzle({
           Practice
         </button>
       </nav>
+
+      {(puzzle.context === "daily" || puzzle.context === "practice") && (
+        <ProgressStrip identity={identity} mode={puzzle.context} outcome={play.outcome} refreshKey={`${play.outcome}:${statsRefresh}`} onOpen={() => setStatsOpen(true)} />
+      )}
 
       {!isFinished ? (
         <section className="play-card" aria-labelledby="puzzle-title">

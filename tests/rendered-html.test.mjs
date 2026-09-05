@@ -21,18 +21,19 @@ import {
   toPublicPuzzle,
 } from "../lib/puzzles.ts";
 import {
-  dailyPlayStorageKey,
   getActiveMode,
   practicePlayStorageKey,
-  restorePlay,
+  restoreOpaquePlayId,
   restorePracticeProgress,
 } from "../lib/play-state.ts";
-import { feedbackPlayFields } from "../lib/feedback-payload.ts";
 import { PLAYER_IDENTITY_KEY, normalizePlayerName, playerHeaders, readPlayerIdentity, savePlayerIdentity } from "../lib/player-identity.ts";
+import { applyGameDataEpoch, GAME_DATA_EPOCH, GAME_DATA_EPOCH_KEY } from "../lib/game-data-epoch.ts";
 
 function memoryStorage(entries = {}) {
   const values = new Map(Object.entries(entries));
   return {
+    get length() { return values.size; },
+    key(index) { return [...values.keys()][index] ?? null; },
     getItem(key) {
       return values.get(key) ?? null;
     },
@@ -50,6 +51,30 @@ test("persists only valid versioned player identities and builds credential head
   assert.deepEqual(playerHeaders(identity), { "x-emojizzle-player-id": identity.playerId, "x-emojizzle-player-session-id": identity.sessionId, "x-emojizzle-player-token": identity.token });
   assert.equal(normalizePlayerName("  PUZZLE   Dad ")?.normalizedDisplayName, "puzzle dad");
   assert.equal(readPlayerIdentity(memoryStorage({ [PLAYER_IDENTITY_KEY]: "broken" })), null);
+});
+
+test("new game-data epoch clears old progress while preserving player identity", () => {
+  const identity = { playerId: "123e4567-e89b-42d3-a456-426614174000", displayName: "Puzzle Dad", sessionId: "223e4567-e89b-42d3-a456-426614174000", token: "a".repeat(43) };
+  const local = memoryStorage({
+    [PLAYER_IDENTITY_KEY]: JSON.stringify(identity),
+    "emojizzle-known-player:v1": JSON.stringify({ displayName: identity.displayName }),
+    "emoji-daily-play:daily:260905:first": JSON.stringify({ outcome: "solved" }),
+    "emoji-daily-play:practice:2:second": JSON.stringify({ outcome: "revealed" }),
+    "emoji-daily-practice-progress": JSON.stringify({ position: 17, cycle: 2 }),
+    "emoji-daily-anonymous-session": "feedback-session",
+  });
+  const session = memoryStorage({ "emoji-daily-active-mode": "practice" });
+
+  assert.equal(applyGameDataEpoch(local, session), true);
+  assert.deepEqual(readPlayerIdentity(local), identity);
+  assert.equal(local.getItem("emojizzle-known-player:v1"), JSON.stringify({ displayName: identity.displayName }));
+  assert.equal(local.getItem("emoji-daily-play:daily:260905:first"), null);
+  assert.equal(local.getItem("emoji-daily-play:practice:2:second"), null);
+  assert.equal(local.getItem("emoji-daily-practice-progress"), null);
+  assert.equal(local.getItem("emoji-daily-anonymous-session"), "feedback-session");
+  assert.equal(session.getItem("emoji-daily-active-mode"), null);
+  assert.equal(local.getItem(GAME_DATA_EPOCH_KEY), GAME_DATA_EPOCH);
+  assert.equal(applyGameDataEpoch(local, session), false, "the migration is idempotent");
 });
 
 test("ships 100 varied, fully authored puzzles for the U.S. public test", () => {
@@ -159,54 +184,12 @@ test("only the genuine daily context is ranking eligible", () => {
   }
 });
 
-test("keeps saved play state isolated while advancing through sequence puzzles", () => {
-  const puzzle2Key = dailyPlayStorageKey(PUZZLES[1].id, "260806");
-  const puzzle3Key = dailyPlayStorageKey(PUZZLES[2].id, "260807");
-  const puzzle2State = {
-    version: 1,
-    playId: "puzzle-2-play",
-    guessCount: 4,
-    hints: ["A phrase"],
-    outcome: "revealed",
-    resolution: { answer: "The elephant in the room", category: "Idiom", explanation: "A hidden obvious problem." },
-    feedbackSent: true,
-  };
-  const storage = memoryStorage({ [puzzle2Key]: JSON.stringify(puzzle2State) });
-
-  assert.deepEqual(restorePlay(storage, puzzle2Key), puzzle2State);
-  assert.equal(restorePlay(storage, puzzle3Key), null, "a puzzle without a save starts fresh");
-  assert.equal(storage.getItem(puzzle3Key), null, "advancing does not copy the prior puzzle save");
-
-  const puzzle3State = {
-    version: 1,
-    playId: "puzzle-3-play",
-    guessCount: 1,
-    hints: [],
-    outcome: "solved",
-    resolution: { answer: "Vincent van Gogh", category: "Person", explanation: "A painter with a famous ear." },
-    feedbackSent: false,
-  };
-  storage.setItem(puzzle3Key, JSON.stringify(puzzle3State));
-  assert.deepEqual(restorePlay(storage, puzzle3Key), puzzle3State, "the next puzzle restores only its own save");
-  assert.deepEqual(restorePlay(storage, puzzle2Key), puzzle2State, "the previous puzzle remains restorable");
-  assert.deepEqual(
-    feedbackPlayFields(PUZZLES[2], puzzle3State),
-    {
-      puzzleId: PUZZLES[2].id,
-      puzzleNumber: 3,
-      playId: "puzzle-3-play",
-      outcome: "solved",
-      guessCount: 1,
-      hintCount: 0,
-    },
-    "feedback for puzzle 3 uses puzzle 3's play state, never puzzle 2's resolution or outcome",
-  );
-});
-
-test("rejects unversioned play saves so pre-feature attempts restart cleanly", () => {
-  const key = dailyPlayStorageKey(PUZZLES[0].id, "260805");
-  const storage = memoryStorage({ [key]: JSON.stringify({ playId: "legacy-play", guessCount: 2, hints: [], outcome: "playing", resolution: null, feedbackSent: false }) });
-  assert.equal(restorePlay(storage, key), null);
+test("restores only opaque attempt IDs from browser storage", () => {
+  const key = practicePlayStorageKey("practice-puzzle", 2);
+  const storage = memoryStorage({ [key]: JSON.stringify({ playId: "practice-play-id" }) });
+  assert.equal(restoreOpaquePlayId(storage, key), "practice-play-id");
+  assert.equal(restoreOpaquePlayId(memoryStorage({ [key]: JSON.stringify({ playId: "bad id", outcome: "solved" }) }), key), null);
+  assert.equal(restoreOpaquePlayId(memoryStorage({ [key]: "broken" }), key), null);
 });
 
 test("restores valid practice progress and isolates replay cycles", () => {
@@ -235,12 +218,13 @@ test("counts down to the next UTC puzzle launch in hours and minutes", () => {
 });
 
 test("keeps answers and credentials out of public payloads and includes the identified Azure interaction loop", async () => {
-  const [page, practicePage, loader, gate, client, api, storage, admin, feedbackAdmin, editor, emojiSearch, nextRoute, startOverRoute, staticConfig] = await Promise.all([
+  const [page, practicePage, loader, gate, client, statsUi, api, storage, admin, feedbackAdmin, editor, emojiSearch, nextRoute, startOverRoute, staticConfig] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/practice/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/GameLoader.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/PlayerIdentityGate.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/DailyPuzzle.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/PlayerStats.tsx", import.meta.url), "utf8"),
     readFile(new URL("../api/src/index.ts", import.meta.url), "utf8"),
     readFile(new URL("../api/src/storage.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/admin/AdminDashboard.tsx", import.meta.url), "utf8"),
@@ -274,6 +258,12 @@ test("keeps answers and credentials out of public payloads and includes the iden
   assert.match(client, /Practice/);
   assert.match(client, /Can you beat my result/);
   assert.match(client, /playerHeaders\(identity\)/);
+  assert.match(client, /JSON\.stringify\(\{ playId: play\.playId \}\)/);
+  assert.doesNotMatch(client, /JSON\.stringify\(play\)/);
+  assert.doesNotMatch(client, /dailyPlayStorageKey/);
+  assert.match(statsUi, /StatsView = "daily" \| "rankings" \| "practice"/);
+  assert.match(statsUi, /players\/me\/glance/);
+  assert.doesNotMatch(statsUi, /stats\.challenges|Practice challenges/);
   assert.match(loader, /PlayerIdentityGate/);
   assert.match(gate, /Choose your player name/);
   assert.match(gate, /players\/availability/);

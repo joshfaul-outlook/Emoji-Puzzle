@@ -12,5 +12,5 @@
     "sourceMap": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "scripts/reset-player-data.ts"]
+  "include": ["src/**/*.ts", "scripts/reset-game-history.ts", "scripts/reset-player-data.ts"]
 }

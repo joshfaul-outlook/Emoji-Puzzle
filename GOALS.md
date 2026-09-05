@@ -44,7 +44,7 @@ The MVP exists to test that hypothesis, not to prove a complete business model.
 
 ## Player statistics and Daily rankings
 
-Players can view separate Daily, Practice, and Practice-challenge history through their player-name Stats control. Daily stats include current and best solve streaks. Public rankings use the last 30 UTC dates: most eligible Daily solves, then most solves without hints, with shared ranks. Public Daily stats default to yes; a player can opt out across all their devices. Practice is always private. Repeated Daily puzzles never count, and the launch schedule never wraps.
+Players can view separate Daily stats, public rankings, and private Practice stats through their player-name Stats control. Daily stats include current and best solve streaks. Shared Practice challenges keep their result-card comparison and do not appear in Stats. Public rankings use the last 30 UTC dates: most eligible Daily solves, then most solves without hints, with shared ranks. Public Daily stats default to yes; a player can opt out across all their devices. Practice is always private. Repeated Daily puzzles never count, and the launch schedule never wraps.
 
 ## What success looks like in this phase
 

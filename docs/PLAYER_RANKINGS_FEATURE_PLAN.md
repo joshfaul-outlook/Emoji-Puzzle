@@ -2,6 +2,8 @@
 
 Status: approved and implemented locally, September 5, 2026. Rankings and the nonrepeating Daily schedule activate automatically on deployment. No separate launch-date configuration is used.
 
+The later [Rankings Display and Fresh-Start Plan](RANKINGS_DISPLAY_REFINEMENT_PLAN.md) supersedes this document's original two-tab layout and removes challenge activity from detailed Stats.
+
 ## Confirmed scope
 
 - Public player rankings use Daily puzzles only.
@@ -55,7 +57,7 @@ Use an em dash for rates and averages with no denominator. Explain that solve ra
 
 Private Daily totals may include late finishes and any separately recorded repeat attempts, labeled as unranked. Resuming an existing canonical attempt is not another attempt or solve. Streaks use the rules below.
 
-Practice totals use `pool=practice` and `context=practice`. Show shared challenges as a separate subsection under Practice, using `pool=practice` and `context=challenge`, so ordinary Practice totals remain understandable. Exclude author tests from player statistics. Each distinct Practice play ID counts as an attempt, including repeats across cycles or devices; also show distinct puzzle counts.
+Practice totals use `pool=practice` and `context=practice`. Shared challenges and author tests are excluded from player statistics. Each distinct Practice play ID counts as an attempt, including repeats across cycles or devices; also show distinct puzzle counts.
 
 Stats aggregate server-recorded plays across the player's devices. Practice position and its active browser attempt remain device-local. Recovery restores recorded statistics without promising to resume the same Practice position on another device.
 

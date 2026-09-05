@@ -9,7 +9,7 @@ import { applyPlayAction, consumeVerificationChallenge, createPlayerSession, cre
 import { suggestPuzzle } from "./suggestions.js";
 import { verificationSender } from "./verification-sender.js";
 import { currentDaily, getDailyAssignment, recordPublicExposure, voidDailyAssignment } from "./daily-schedule.js";
-import { playerStats, rankingsPage, RankingsError } from "./rankings.js";
+import { playerGlance, playerStats, rankingsPage, RankingsError } from "./rankings.js";
 
 const launchDate = parseGameLaunchDate();
 const playerIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -283,6 +283,10 @@ export async function myStats(request: HttpRequest, context: InvocationContext) 
   if (window !== "all" && window !== "30d") return json({ error: "Invalid stats window" }, 400);
   return json(await playerStats(identity.player, window));
 }
+export async function myGlance(request: HttpRequest, context: InvocationContext) {
+  const identity = await authenticatedPlayer(request, context); if ("denied" in identity) return identity.denied;
+  return json(await playerGlance(identity.player));
+}
 export async function playerPreferences(request: HttpRequest, context: InvocationContext) {
   const denied = requireOrigin(request); if (denied) return denied;
   const identity = await authenticatedPlayer(request, context); if ("denied" in identity) return identity.denied;
@@ -407,6 +411,7 @@ app.http("adminPlayerSupport", { methods: ["GET"], authLevel: "anonymous", route
 app.http("adminPuzzleSuggestions", { methods: ["POST"], authLevel: "anonymous", route: "manage/puzzle-suggestions", handler: handle(adminPuzzleSuggestions) });
 
 app.http("myStats", { methods: ["GET"], authLevel: "anonymous", route: "players/me/stats", handler: handle(myStats) });
+app.http("myGlance", { methods: ["GET"], authLevel: "anonymous", route: "players/me/glance", handler: handle(myGlance) });
 app.http("playerPreferences", { methods: ["PATCH"], authLevel: "anonymous", route: "players/me/preferences", handler: handle(playerPreferences) });
 app.http("publicRankings", { methods: ["GET"], authLevel: "anonymous", route: "rankings", handler: handle(publicRankings) });
 app.http("voidDaily", { methods: ["POST"], authLevel: "anonymous", route: "manage/daily/void", handler: handle(voidDaily) });

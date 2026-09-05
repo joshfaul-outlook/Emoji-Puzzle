@@ -11,6 +11,7 @@
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --experimental-strip-types scripts/test.mjs",
     "seed": "tsx scripts/seed.ts",
+    "reset:game-history": "tsx scripts/reset-game-history.ts",
     "reset:player-data": "tsx scripts/reset-player-data.ts",
     "import:feedback": "tsx scripts/import-feedback.ts"
   },

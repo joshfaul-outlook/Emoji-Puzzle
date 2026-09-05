@@ -6,13 +6,15 @@
 .stats-heading h2 { margin: 0; font: 600 clamp(24px, 6vw, 32px) var(--font-editorial); }
 .stats-eyebrow { color: var(--muted); font-size: 12px; margin: 0 0 5px; overflow-wrap: anywhere; }
 .stats-close { flex-shrink: 0; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); }
-.stats-tabs { display: flex; gap: 6px; margin: 24px 0; padding: 5px; background: var(--surface-muted); border-radius: 12px; }
-.stats-tabs button { flex: 1; min-height: 44px; border: 0; border-radius: 8px; background: transparent; font-weight: 700; }
-.stats-tabs button[aria-pressed="true"] { background: var(--surface); box-shadow: var(--shadow); color: var(--slate-dark); }
+.stats-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 24px 0; padding: 5px; background: var(--surface-muted); border-radius: 12px; }
+.stats-tabs button { min-height: 44px; border: 0; border-radius: 8px; background: transparent; font-weight: 700; }
+.stats-tabs button[aria-selected="true"], .stats-tabs button[aria-pressed="true"] { background: var(--surface); box-shadow: var(--shadow); color: var(--slate-dark); }
 .stats-filter { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 14px; }
 .stats-filter select { min-height: 44px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .streak-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
 .streak-cards > div { display: flex; flex-direction: column; gap: 4px; padding: 20px 12px; border-radius: 14px; background: var(--mist-soft); text-align: center; }
+.streak-cards.has-rank { grid-template-columns: repeat(3, 1fr); }
+.streak-cards > .rank-card { background: var(--gold-soft); }
 .streak-cards strong { font-size: 36px; line-height: 1.15; color: var(--slate-dark); }
 .streak-cards span { font-size: 12px; }
 .stats-section { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 16px; }
@@ -38,6 +40,15 @@
 .player-chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .stats-dialog .secondary-button { min-height: 44px; margin-top: 12px; }
 .daily-streak { color: var(--slate-dark); font-weight: 700; }
+.progress-strip { width: min(100%, 440px); min-height: 46px; margin: 0 auto 10px; display: grid; grid-template-columns: 1fr 1fr auto; align-items: center; gap: 8px; border: 0; border-radius: 13px; padding: 7px 9px 7px 13px; background: color-mix(in srgb, var(--mist-soft) 78%, var(--surface)); text-align: left; }
+.progress-strip.metric-sentence { grid-template-columns: 1fr auto; }
+.progress-item { min-width: 0; display: flex; align-items: center; gap: 7px; }
+.progress-icon { font-size: 17px; }
+.progress-item > span:last-child { min-width: 0; display: grid; gap: 1px; }
+.progress-item strong, .progress-item small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.progress-item strong { font-size: 13px; }
+.progress-item small { color: var(--muted); font-size: 11px; }
+.progress-arrow { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--surface) 84%, transparent); color: var(--slate-dark); font-size: 18px; }
 .stats-dialog :focus-visible { outline: 3px solid var(--brand-slate); outline-offset: 3px; }
 
 :root {
@@ -703,6 +714,8 @@ footer span:first-child { color: var(--ink); font-family: Georgia, serif; font-s
   .puzzle-card-number { min-height: 26px; padding: 4px 7px; font-size: 11px; letter-spacing: .03em; }
   .play-card, .result-card { margin-top: 23px; padding-inline: 16px; border-radius: 22px; }
   .mode-switch { margin-top: 12px; margin-bottom: -10px; }
+  .streak-cards.has-rank { grid-template-columns: 1fr 1fr; }
+  .streak-cards.has-rank .rank-card { grid-column: 1 / -1; flex-direction: row; align-items: baseline; justify-content: center; }
   .play-card { padding-top: 27px; }
   .emoji-stage { min-height: 139px; margin-top: 21px; }
   .guess-form { grid-template-columns: 1fr; }

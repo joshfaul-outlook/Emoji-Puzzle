@@ -88,6 +88,49 @@ export async function visibleRankings(now = new Date()) {
 export function publicRankingRow(row: RankingRow) {
   return { rank: row.rank, displayName: row.displayName, solves: row.solves, unaidedSolves: row.unaidedSolves, currentStreak: row.currentStreak };
 }
+
+export type PlayerGlance = {
+  daily: {
+    currentStreak: number;
+    currentPublicRank: number | null;
+    rankingsStatus: "ready" | "unavailable";
+    rankingsAsOf: string | null;
+  };
+  practice: { solved: number; solveRate: number | null };
+  publicStats: boolean;
+};
+
+// This intentionally uses the same aggregation and visibility paths as the
+// detailed view, but does not return its history, rankings rows, or challenges.
+export async function playerGlance(player: PlayerRecord, now = new Date()): Promise<PlayerGlance> {
+  await ensureDailyAssignment(now);
+  const launch = await getRankingsLaunchDate();
+  const [plays, assignments] = await Promise.all([listPlays(player.playerId), listDailyAssignments()]);
+  const practice = summarizePlays(plays.filter((p) => p.context === "practice" && p.pool === "practice"));
+  let currentPublicRank: number | null = null;
+  let rankingsAsOf: string | null = null;
+  let rankingsStatus: "ready" | "unavailable" = launch ? "ready" : "unavailable";
+  if (launch && player.publicStats) {
+    try {
+      const visible = await visibleRankings(now);
+      rankingsAsOf = visible.snapshot.asOf;
+      currentPublicRank = visible.rows.find((row) => row.playerId === player.playerId)?.rank ?? null;
+    } catch {
+      rankingsStatus = "unavailable";
+    }
+  }
+  return {
+    daily: {
+      currentStreak: launch ? dailyStreaks(plays, assignments, launch, now).current : 0,
+      currentPublicRank,
+      rankingsStatus,
+      rankingsAsOf,
+    },
+    practice: { solved: practice.solved, solveRate: practice.solveRate },
+    publicStats: player.publicStats,
+  };
+}
+
 export async function rankingsPage(cursor?: string, now = new Date()) {
   const { snapshot, rows, version } = await visibleRankings(now);
   let offset = 0;
@@ -111,7 +154,7 @@ export async function playerStats(player: PlayerRecord, window: "all" | "30d" = 
   const [plays, assignments] = await Promise.all([listPlays(player.playerId), listDailyAssignments()]);
   const from = new Date(Date.parse(`${now.toISOString().slice(0, 10)}T00:00:00Z`) - 29 * 86_400_000).toISOString();
   const filtered = window === "30d" ? plays.filter((p) => p.startedAt >= from) : plays;
-  const select = (context: "daily" | "practice" | "challenge") => filtered.filter((p) => p.context === context && p.pool === (context === "daily" ? "daily" : "practice"));
+  const select = (context: "daily" | "practice") => filtered.filter((p) => p.context === context && p.pool === context);
   let ownRank: ReturnType<typeof publicRankingRow> | null = null; let rankingsAsOf: string | null = null;
   let rankingsStatus: "ready" | "unavailable" = launch ? "ready" : "unavailable";
   if (rankingsStatus === "ready") {
@@ -121,8 +164,8 @@ export async function playerStats(player: PlayerRecord, window: "all" | "30d" = 
       if (row) ownRank = publicRankingRow(row);
     } catch { rankingsStatus = "unavailable"; }
   }
-  return { daily: summarizePlays(select("daily")), practice: summarizePlays(select("practice")), challenges: summarizePlays(select("challenge")),
+  return { daily: summarizePlays(select("daily")), practice: summarizePlays(select("practice")),
     streaks: launch ? dailyStreaks(plays, assignments, launch, now) : { current: 0, best: 0 },
     publicStats: player.publicStats, ownRank, rankingsAsOf, rankingsStatus, launchDate: launch, window,
-    asOf: now.toISOString(), coverageStart: summarizePlays(plays.filter((p) => p.context !== "author-test")).coverageStart };
+    asOf: now.toISOString() };
 }

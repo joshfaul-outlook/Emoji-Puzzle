@@ -7,8 +7,8 @@ import { TableClient } from "@azure/data-tables";
 import { createPlayerWithSession, createPuzzle, applyPlayAction, getPlayer, setPublicStats, listPlays, startPlay, playerTable, puzzleTable, updatePuzzle } from "../dist/src/storage.js";
 import { hashPlayerToken } from "../dist/src/player-identity.js";
 import { ensureDailyAssignment, getDailyAssignment, getRankingsLaunchDate, voidDailyAssignment, recordPublicExposure } from "../dist/src/daily-schedule.js";
-import { playerStats, rankingsPage } from "../dist/src/rankings.js";
-import { currentPuzzle, playsStart, guess, hint, reveal, myStats, playerPreferences } from "../dist/src/index.js";
+import { playerGlance, playerStats, rankingsPage } from "../dist/src/rankings.js";
+import { currentPuzzle, playsStart, guess, hint, reveal, myGlance, myStats, playerPreferences } from "../dist/src/index.js";
 
 process.env.GAME_LAUNCH_DATE = "2090-01-01";
 process.env.PLAYER_RECOVERY_HMAC_SECRET = "rankings-test-secret-at-least-32-characters";
@@ -37,16 +37,18 @@ test("rankings storage, schedule and authenticated API integration", async (t) =
     await puzzleTable().createEntity({ partitionKey: "DailySchedule", rowKey: "initialized", launchDate: "2090-01-01" });
     await puzzleTable().createEntity({ partitionKey: "DailySchedule", rowKey: `puzzle:${first.id}`, dailyDate: "prelaunch" });
     await puzzleTable().createEntity({ partitionKey: "DailySchedule", rowKey: "date:2090-01-01", assignmentJson: JSON.stringify({ dailyDate: "2090-01-01", puzzleId: null, revision: null, void: true, reason: "inventory-exhausted", puzzle: null }) });
-    const results = await Promise.all(Array.from({ length: 4 }, () => ensureDailyAssignment(new Date("2090-01-01T12:00:00Z"))));
-    assert.equal(new Set(results.map((r) => r.puzzleId)).size, 1);
-    day1 = results[0]; assert.equal(day1.puzzleId, first.id);
+    // Run the one-time legacy migration once; it deliberately rejects unknown
+    // legacy shapes and is separate from normal assignment concurrency.
+    day1 = await ensureDailyAssignment(new Date("2090-01-01T12:00:00Z"));
+    assert.equal(day1.puzzleId, first.id);
     assert.equal(await getRankingsLaunchDate(), "2090-01-01", "first deployed request fixes the rankings epoch");
     const edited = await updatePuzzle(first, { answer: "Edited answer", acceptedAnswers: ["Edited answer"], pool: "practice" }, first.etag);
     assert.equal(edited.answer, "Edited answer");
     assert.equal((await getDailyAssignment("2090-01-01")).puzzle.answer, "First answer");
     await assert.rejects(() => recordPublicExposure(first.id), /assigned Daily/);
-    const next = await ensureDailyAssignment(new Date("2090-01-02T12:00:00Z"));
-    assert.equal(next.puzzleId, second.id);
+    const results = await Promise.all(Array.from({ length: 4 }, () => ensureDailyAssignment(new Date("2090-01-02T12:00:00Z"))));
+    assert.equal(new Set(results.map((result) => result.puzzleId)).size, 1);
+    assert.equal(results[0].puzzleId, second.id);
     assert.equal(await getRankingsLaunchDate(), "2090-01-01", "later requests and deployments reuse the persisted epoch");
     assert.equal((await ensureDailyAssignment(new Date("2090-01-03T12:00:00Z"))).void, true);
   });
@@ -80,6 +82,7 @@ test("rankings storage, schedule and authenticated API integration", async (t) =
   });
   await t.test("private stats require authentication and cannot select another player", async () => {
     assert.equal((await myStats(request("players/me/stats"), context)).status, 401);
+    assert.equal((await myGlance(request("players/me/glance"), context)).status, 401);
     const response = await myStats(request(`players/me/stats?playerId=${ada.player.playerId}`, bob), context);
     assert.equal(response.status, 200); assert.equal(response.jsonBody.daily.started, 0);
     assert.equal(response.headers["cache-control"], "no-store");
@@ -126,6 +129,23 @@ test("rankings storage, schedule and authenticated API integration", async (t) =
     await setPublicStats(bob.player.playerId, true);
     const privateStats = await playerStats(await getPlayer(bob.player.playerId), "all", new Date("2090-01-02T12:00:02Z"));
     assert.equal(privateStats.streaks.current, 1); assert.equal(privateStats.ownRank.rank, 1);
+    assert.equal("challenges" in privateStats, false, "challenge activity is absent from detailed stats");
+    const practicePuzzle = await createPuzzle({ ...authored("Practice answer"), pool: "practice" });
+    const ordinaryPractice = (await startPlay({ playerId: bob.player.playerId, playId: randomUUID(), puzzleId: practicePuzzle.id, puzzleNumber: practicePuzzle.number, pool: "practice", context: "practice", rankingEligible: false })).play;
+    const challengePractice = (await startPlay({ playerId: bob.player.playerId, playId: randomUUID(), puzzleId: practicePuzzle.id, puzzleNumber: practicePuzzle.number, pool: "practice", context: "challenge", rankingEligible: false })).play;
+    await applyPlayAction({ playerId: bob.player.playerId, playId: ordinaryPractice.playId, puzzleId: practicePuzzle.id, pool: "practice", operationId: "practice-solve", kind: "guess", correct: true });
+    await applyPlayAction({ playerId: bob.player.playerId, playId: challengePractice.playId, puzzleId: practicePuzzle.id, pool: "practice", operationId: "challenge-reveal", kind: "reveal" });
+    const glance = await playerGlance(await getPlayer(bob.player.playerId), new Date("2090-01-02T12:00:02Z"));
+    assert.deepEqual(glance, {
+      daily: { currentStreak: 1, currentPublicRank: 1, rankingsStatus: "ready", rankingsAsOf: privateStats.rankingsAsOf },
+      practice: { solved: 1, solveRate: 1 },
+      publicStats: true,
+    });
+    assert.equal(JSON.stringify(glance).includes(bob.player.playerId), false, "the glance never exposes a player ID");
+    await setPublicStats(bob.player.playerId, false);
+    const privateGlance = await playerGlance(await getPlayer(bob.player.playerId), new Date("2090-01-02T12:00:02Z"));
+    assert.equal(privateGlance.daily.currentPublicRank, null);
+    assert.equal(privateGlance.daily.rankingsAsOf, null);
     await voidDailyAssignment("2090-01-02");
     // A snapshot invalidated by a void must never expose its old credit while a
     // refresh lease is active. Returning unavailable is safer than stale rank.

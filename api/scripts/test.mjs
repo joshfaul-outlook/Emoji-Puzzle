@@ -20,7 +20,10 @@ const waitForTable = () => new Promise((resolveReady, reject) => {
 
 try {
   await waitForTable();
-  const tests = spawn(process.execPath, ["--experimental-strip-types", "--test", "tests/*.test.mjs"], { cwd: resolve(import.meta.dirname, ".."), shell: true, stdio: "inherit", env: { ...process.env, TABLE_STORAGE_CONNECTION_STRING: "UseDevelopmentStorage=true" } });
+  // The integration tests intentionally share the fixed Azurite table names.
+  // Run files sequentially so their table resets and migration fixtures cannot
+  // race each other.
+  const tests = spawn(process.execPath, ["--experimental-strip-types", "--test", "--test-concurrency=1", "tests/*.test.mjs"], { cwd: resolve(import.meta.dirname, ".."), shell: true, stdio: "inherit", env: { ...process.env, TABLE_STORAGE_CONNECTION_STRING: "UseDevelopmentStorage=true" } });
   const code = await new Promise((resolveExit) => tests.once("exit", resolveExit));
   if (code !== 0) process.exitCode = typeof code === "number" ? code : 1;
 } finally {

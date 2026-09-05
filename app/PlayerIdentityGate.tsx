@@ -2,6 +2,7 @@
 
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { clearPlayerIdentity, invalidatePlayerIdentity, normalizePlayerName, readKnownPlayer, readPlayerIdentity, savePlayerIdentity, type KnownPlayer, type PlayerIdentity } from "../lib/player-identity";
+import { applyGameDataEpoch } from "../lib/game-data-epoch";
 import { BrandWordmark } from "./components/BrandWordmark";
 import { KnowingMark } from "./components/KnowingMark";
 
@@ -23,6 +24,7 @@ export function PlayerIdentityGate({ children }: { children: (identity: PlayerId
 
   useEffect(() => {
     const task = window.setTimeout(() => {
+      applyGameDataEpoch(localStorage, sessionStorage);
       const stored = readPlayerIdentity(localStorage);
       if (!stored) clearPlayerIdentity(localStorage);
       const known = readKnownPlayer(localStorage);

@@ -30,16 +30,13 @@ export function getActiveMode(storage: StorageLike): "daily" | "practice" {
   return storage.getItem(ACTIVE_MODE_KEY) === "practice" ? "practice" : "daily";
 }
 
-export function restorePlay(storage: StorageLike, storageKey: string): PlayState | null {
+export function restoreOpaquePlayId(storage: StorageLike, storageKey: string) {
   const saved = storage.getItem(storageKey);
   if (!saved) return null;
 
   try {
-    const parsed = JSON.parse(saved) as Partial<PlayState>;
-    if (parsed.version !== 1 || typeof parsed.playId !== "string" || !/^[A-Za-z0-9_-]{8,100}$/.test(parsed.playId)) return null;
-    if (!Number.isInteger(parsed.guessCount) || (parsed.guessCount as number) < 0 || !Array.isArray(parsed.hints)) return null;
-    if (parsed.outcome !== "playing" && parsed.outcome !== "solved" && parsed.outcome !== "revealed") return null;
-    return parsed as PlayState;
+    const parsed = JSON.parse(saved) as { playId?: unknown };
+    return typeof parsed.playId === "string" && /^[A-Za-z0-9_-]{8,100}$/.test(parsed.playId) ? parsed.playId : null;
   } catch {
     return null;
   }
@@ -68,10 +65,6 @@ export function restorePracticeProgress(
   }
 
   return { position: 1, cycle: 0 };
-}
-
-export function dailyPlayStorageKey(puzzleId: string, dateCode: string) {
-  return `emoji-daily-play:daily:${dateCode}:${puzzleId}`;
 }
 
 export function practicePlayStorageKey(puzzleId: string, cycle: number) {
