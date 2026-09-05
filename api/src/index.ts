@@ -1,13 +1,15 @@
 import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from "@azure/functions";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { adminConfigured, clearSessionCookie, createSessionCookie, isAdmin, passwordAccepted } from "./auth.js";
 import { body, json, requireAdmin, requireOrigin } from "./http.js";
 import { parseGameLaunchDate } from "./game-config.js";
 import { isAcceptedGuess, validatePuzzle, type PuzzlePool, type PuzzleStatus, type StoredPuzzle } from "./model.js";
-import { createPlayerToken, createVerificationCode, hashPlayerToken, hashVerificationCode, isRankingEligiblePlay, normalizePlayerName, normalizeRecoveryEmail, playerTokenMatches, recoveryEmailKey, verificationClientKey, verificationCodeMatches } from "./player-identity.js";
-import { applyPlayAction, consumeVerificationChallenge, createPlayerSession, createPlayerWithSession, createVerificationChallenge, getPlay, getPlayer, getPlayerByEmailKey, getPlayerByNormalizedName, getPlayerSession, getVerificationChallenge, insertFeedback, listFeedback, listPlayerSessions, listPuzzles, markFeedbackSubmitted, NameUnavailableError, playerNameAvailable, PlayConflictError, recordVerificationFailure, revokePlayerSession, startPlay, touchPlayer, touchPlayerSession, VerificationConflictError, VerificationRateLimitError, createPuzzle, getPuzzle, updatePuzzle, type PlayContext, type PlayerRecord, type PlayerSession, type VerificationPurpose } from "./storage.js";
+import { createPlayerToken, createVerificationCode, hashPlayerToken, hashVerificationCode, normalizePlayerName, normalizeRecoveryEmail, playerTokenMatches, recoveryEmailKey, verificationClientKey, verificationCodeMatches } from "./player-identity.js";
+import { applyPlayAction, consumeVerificationChallenge, createPlayerSession, createPlayerWithSession, createVerificationChallenge, getPlay, getPlayer, getPlayerByEmailKey, getPlayerByNormalizedName, getPlayerSession, getVerificationChallenge, insertFeedback, listFeedback, listPlayerSessions, listPuzzles, markFeedbackSubmitted, NameUnavailableError, playerNameAvailable, PlayConflictError, recordVerificationFailure, revokePlayerSession, startPlay, touchPlayer, touchPlayerSession, VerificationConflictError, VerificationRateLimitError, createPuzzle, getPuzzle, updatePuzzle, type PlayContext, type PlayerRecord, type PlayerSession, type VerificationPurpose, setPublicStats } from "./storage.js";
 import { suggestPuzzle } from "./suggestions.js";
 import { verificationSender } from "./verification-sender.js";
+import { currentDaily, getDailyAssignment, recordPublicExposure, voidDailyAssignment } from "./daily-schedule.js";
+import { playerStats, rankingsPage, RankingsError } from "./rankings.js";
 
 const launchDate = parseGameLaunchDate();
 const playerIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -51,11 +53,17 @@ function validPlayIdentifiers(playId: unknown, operationId?: unknown) {
 function publicPuzzle(puzzle: StoredPuzzle, puzzles: StoredPuzzle[], context: "daily" | "practice" | "challenge" | "author-test", now = new Date()) {
   const dateCode = context === "daily" ? now.toISOString().slice(2, 10).replace(/-/g, "") : null;
   const originalDate = new Date(launchDate + (puzzle.position - 1) * 86_400_000).toISOString().slice(2, 10).replace(/-/g, "");
-  return { id: puzzle.id, number: puzzle.number, emoji: puzzle.emoji, hintCount: puzzle.hints.length, pool: puzzle.pool, context, sequenceNumber: puzzles.findIndex((item) => item.id === puzzle.id) + 1, sequenceLength: puzzles.length, dateCode, rankingEligible: context === "daily", legacyStorageEligible: dateCode !== null && dateCode === originalDate };
+  return { id: puzzle.id, number: puzzle.number, emoji: puzzle.emoji, hintCount: puzzle.hints.length, pool: puzzle.pool, context, sequenceNumber: puzzles.findIndex((item) => item.id === puzzle.id) + 1, sequenceLength: puzzles.length, dateCode, rankingEligible: false, legacyStorageEligible: dateCode !== null && dateCode === originalDate };
 }
 
-async function currentPuzzle(request: HttpRequest) {
+export async function currentPuzzle(request: HttpRequest) {
   const mode = request.query.get("mode") ?? "daily";
+  if (mode !== "practice" && (mode === "next" || request.query.has("puzzle")) && !isAdmin(request)) return json({ error: "Admin preview required" }, 403);
+  if (mode !== "practice" && mode !== "next" && !request.query.has("puzzle")) {
+    const { puzzle, assignment } = await currentDaily();
+    if (!puzzle) return json({ error: "Today's Daily puzzle is unavailable. You can still play Practice.", code: "DAILY_UNAVAILABLE" }, 503);
+    return json({ puzzle: { ...publicPuzzle(puzzle, [puzzle], "daily"), rankingEligible: !assignment.void, legacyStorageEligible: false } });
+  }
   const pool: PuzzlePool = mode === "practice" ? "practice" : "daily";
   const puzzles = (await listPuzzles({ status: "published", pool })).sort((a, b) => a.position - b.position);
   if (!puzzles.length) return json({ error: "Puzzle catalog is empty" }, 503);
@@ -83,30 +91,44 @@ async function currentPuzzle(request: HttpRequest) {
       context = "author-test";
     } else { selected = puzzles[dailyIndex]; context = "daily"; }
   }
+  if (pool === "practice") await recordPublicExposure(selected.id);
   return json({ puzzle: publicPuzzle(selected, puzzles, context), ...(nextPuzzleNumber ? { nextPuzzleNumber } : {}) });
 }
 
-async function guess(request: HttpRequest, context: InvocationContext) {
+async function puzzleForPlay(request: HttpRequest, playerId: string, payload: { puzzleId?: unknown; playId?: unknown; pool?: unknown } | null) {
+  if (!payload || typeof payload.puzzleId !== "string" || !validPlayIdentifiers(payload.playId)) return null;
+  const play = await getPlay(playerId, payload.playId as string);
+  if (!play || play.puzzleId !== payload.puzzleId || play.pool !== payload.pool) return null;
+  if (play.context === "author-test" && !isAdmin(request)) throw new RankingsError("Admin preview required", 403);
+  if (play.pool === "daily" && play.context !== "daily" && play.context !== "author-test") return null;
+  if (play.context === "daily" && play.dailyDate) {
+    const assignment = await getDailyAssignment(play.dailyDate);
+    return assignment?.puzzleId === play.puzzleId && assignment.revision === play.puzzleRevision ? assignment.puzzle : null;
+  }
+  return getPuzzle(play.puzzleId);
+}
+
+export async function guess(request: HttpRequest, context: InvocationContext) {
   const denied = requireOrigin(request); if (denied) return denied;
   const identity = await authenticatedPlayer(request, context); if ("denied" in identity) return identity.denied;
   const payload = await body<{ puzzleId?: string; pool?: PuzzlePool; guess?: string; playId?: string; operationId?: string }>(request);
-  const puzzle = payload?.puzzleId ? await getPuzzle(payload.puzzleId) : null;
+  const puzzle = await puzzleForPlay(request, identity.player.playerId, payload);
   const candidate = payload?.guess?.trim() ?? "";
-  if (!puzzle || puzzle.status !== "published" || puzzle.pool !== payload?.pool || !candidate || candidate.length > 120 || !validPlayIdentifiers(payload?.playId, payload?.operationId)) return json({ error: "Invalid guess" }, 400);
+  if (!puzzle || puzzle.status !== "published" || puzzle.pool !== payload?.pool || !candidate || candidate.length > 120 || (typeof payload?.operationId !== "string" || !validPlayIdentifiers(payload?.playId, payload?.operationId))) return json({ error: "Invalid guess" }, 400);
   const correct = isAcceptedGuess(puzzle, candidate);
-  try { await applyPlayAction({ playerId: identity.player.playerId, playId: payload.playId!, puzzleId: puzzle.id, pool: puzzle.pool, operationId: payload.operationId!, kind: "guess", correct }); }
+  try { await applyPlayAction({ playerId: identity.player.playerId, playId: payload.playId!, puzzleId: puzzle.id, pool: puzzle.pool, operationId: payload.operationId!, kind: "guess", correct, fingerprint: createHash("sha256").update(candidate).digest("hex") }); }
   catch (error) { if (error instanceof PlayConflictError) return json({ error: error.message }, 409); throw error; }
   if (!correct) return json({ correct: false });
   return json({ correct: true, resolution: { answer: puzzle.answer, category: puzzle.category, explanation: puzzle.explanation } });
 }
 
-async function hint(request: HttpRequest, context: InvocationContext) {
+export async function hint(request: HttpRequest, context: InvocationContext) {
   const denied = requireOrigin(request); if (denied) return denied;
   const identity = await authenticatedPlayer(request, context); if ("denied" in identity) return identity.denied;
   const payload = await body<{ puzzleId?: string; pool?: PuzzlePool; hintIndex?: number; playId?: string; operationId?: string }>(request);
-  const puzzle = payload?.puzzleId ? await getPuzzle(payload.puzzleId) : null;
+  const puzzle = await puzzleForPlay(request, identity.player.playerId, payload);
   const index = payload?.hintIndex;
-  if (!puzzle || puzzle.status !== "published" || puzzle.pool !== payload?.pool || !Number.isInteger(index) || (index as number) < 0 || !validPlayIdentifiers(payload?.playId, payload?.operationId)) return json({ error: "Invalid hint request" }, 400);
+  if (!puzzle || puzzle.status !== "published" || puzzle.pool !== payload?.pool || !Number.isInteger(index) || (index as number) < 0 || (typeof payload?.operationId !== "string" || !validPlayIdentifiers(payload?.playId, payload?.operationId))) return json({ error: "Invalid hint request" }, 400);
   const value = puzzle.hints[index as number];
   if (!value) return json({ error: "No more hints" }, 404);
   try { await applyPlayAction({ playerId: identity.player.playerId, playId: payload.playId!, puzzleId: puzzle.id, pool: puzzle.pool, operationId: payload.operationId!, kind: "hint", hintIndex: index }); }
@@ -114,23 +136,23 @@ async function hint(request: HttpRequest, context: InvocationContext) {
   return json({ hint: value });
 }
 
-async function reveal(request: HttpRequest, context: InvocationContext) {
+export async function reveal(request: HttpRequest, context: InvocationContext) {
   const denied = requireOrigin(request); if (denied) return denied;
   const identity = await authenticatedPlayer(request, context); if ("denied" in identity) return identity.denied;
   const payload = await body<{ puzzleId?: string; pool?: PuzzlePool; playId?: string; operationId?: string }>(request);
-  const puzzle = payload?.puzzleId ? await getPuzzle(payload.puzzleId) : null;
-  if (!puzzle || puzzle.status !== "published" || puzzle.pool !== payload?.pool || !validPlayIdentifiers(payload?.playId, payload?.operationId)) return json({ error: "Invalid puzzle" }, 400);
+  const puzzle = await puzzleForPlay(request, identity.player.playerId, payload);
+  if (!puzzle || puzzle.status !== "published" || puzzle.pool !== payload?.pool || (typeof payload?.operationId !== "string" || !validPlayIdentifiers(payload?.playId, payload?.operationId))) return json({ error: "Invalid puzzle" }, 400);
   try { await applyPlayAction({ playerId: identity.player.playerId, playId: payload.playId!, puzzleId: puzzle.id, pool: puzzle.pool, operationId: payload.operationId!, kind: "reveal" }); }
   catch (error) { if (error instanceof PlayConflictError) return json({ error: error.message }, 409); throw error; }
   return json({ resolution: { answer: puzzle.answer, category: puzzle.category, explanation: puzzle.explanation } });
 }
 
-async function feedback(request: HttpRequest, context: InvocationContext) {
+export async function feedback(request: HttpRequest, context: InvocationContext) {
   const denied = requireOrigin(request); if (denied) return denied;
   const identity = await authenticatedPlayer(request, context); if ("denied" in identity) return identity.denied;
   const payload = await body<Record<string, unknown>>(request);
   const pool = payload?.pool === "daily" || payload?.pool === "practice" ? payload.pool : null;
-  const puzzle = typeof payload?.puzzleId === "string" ? await getPuzzle(payload.puzzleId) : null;
+  const puzzle = await puzzleForPlay(request, identity.player.playerId, payload);
   const comment = typeof payload?.comment === "string" ? payload.comment.trim() || null : null;
   if (!puzzle || puzzle.status !== "published" || puzzle.pool !== pool || puzzle.number !== payload?.puzzleNumber || (payload?.rating !== "up" && payload?.rating !== "down") || !validPlayIdentifiers(payload?.playId) || typeof payload?.anonymousSessionId !== "string" || (comment?.length ?? 0) > 500 || (pool === "practice" && comment !== null)) return json({ error: "Invalid feedback" }, 400);
   const play = await getPlay(identity.player.playerId, payload.playId as string);
@@ -232,27 +254,53 @@ async function currentPlayerSession(request: HttpRequest, context: InvocationCon
   return json({ playerId: identity.player.playerId, displayName: identity.player.displayName, sessionId: identity.session.sessionId });
 }
 
-async function playsStart(request: HttpRequest, context: InvocationContext) {
+export async function playsStart(request: HttpRequest, context: InvocationContext) {
   const denied = requireOrigin(request); if (denied) return denied;
   const identity = await authenticatedPlayer(request, context); if ("denied" in identity) return identity.denied;
   const payload = await body<{ playId?: string; puzzleId?: string; pool?: PuzzlePool; context?: PlayContext }>(request);
-  const contexts: PlayContext[] = ["daily", "practice", "challenge", "author-test"];
-  const puzzle = payload?.puzzleId ? await getPuzzle(payload.puzzleId) : null;
-  if (!puzzle || puzzle.status !== "published" || puzzle.pool !== payload?.pool || !contexts.includes(payload?.context as PlayContext) || !validPlayIdentifiers(payload?.playId)) return json({ error: "Invalid play" }, 400);
-  let isCurrentDaily = false;
-  if (payload.context === "daily" && puzzle.pool === "daily") {
-    const daily = (await listPuzzles({ status: "published", pool: "daily" })).sort((a, b) => a.position - b.position);
-    const today = Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate());
-    isCurrentDaily = daily.length > 0 && daily[Math.max(0, Math.floor((today - launchDate) / 86_400_000)) % daily.length]?.id === puzzle.id;
-  }
+  if (!payload || !validPlayIdentifiers(payload.playId) || typeof payload.puzzleId !== "string") return json({ error: "Invalid play" }, 400);
+  if (payload.context === "author-test" && !isAdmin(request)) return json({ error: "Admin preview required" }, 403);
+  if (!(payload.context === "daily" && payload.pool === "daily" || (payload.context === "practice" || payload.context === "challenge") && payload.pool === "practice" || payload.context === "author-test")) return json({ error: "Invalid play context" }, 400);
+  const daily = payload.context === "daily" ? await currentDaily() : null;
+  const puzzle = daily ? daily.puzzle : await getPuzzle(payload.puzzleId);
+  if (!puzzle || puzzle.id !== payload.puzzleId || puzzle.status !== "published" || puzzle.pool !== payload.pool) return json({ error: "This puzzle is no longer available here. Open today's Daily puzzle.", code: "DAILY_CHANGED" }, 409);
+  if (puzzle.pool === "practice" && payload.context !== "author-test") await recordPublicExposure(puzzle.id);
   try {
-    const result = await startPlay({ playerId: identity.player.playerId, playId: payload.playId!, puzzleId: puzzle.id, puzzleNumber: puzzle.number, pool: puzzle.pool, context: payload.context!, rankingEligible: isRankingEligiblePlay(payload.context!, puzzle.pool, isCurrentDaily) });
+    const assignment = daily?.assignment;
+    const result = await startPlay({ playerId: identity.player.playerId, playId: payload.playId!, puzzleId: puzzle.id, puzzleNumber: puzzle.number, pool: puzzle.pool, context: payload.context!, rankingEligible: Boolean(assignment && !assignment.void),
+      ...(assignment ? { dailyDate: assignment.dailyDate, puzzleRevision: assignment.revision!, rankingOutcome: "pending" as const } : {}) });
     return json({
       play: result.play,
       hints: puzzle.hints.slice(0, result.play.hintCount),
       ...(result.play.outcome !== "playing" ? { resolution: { answer: puzzle.answer, category: puzzle.category, explanation: puzzle.explanation } } : {}),
     }, result.created ? 201 : 200);
   } catch (error) { if (error instanceof PlayConflictError) return json({ error: error.message }, 409); throw error; }
+}
+
+export async function myStats(request: HttpRequest, context: InvocationContext) {
+  const identity = await authenticatedPlayer(request, context); if ("denied" in identity) return identity.denied;
+  const window = request.query.get("window") ?? "all";
+  if (window !== "all" && window !== "30d") return json({ error: "Invalid stats window" }, 400);
+  return json(await playerStats(identity.player, window));
+}
+export async function playerPreferences(request: HttpRequest, context: InvocationContext) {
+  const denied = requireOrigin(request); if (denied) return denied;
+  const identity = await authenticatedPlayer(request, context); if ("denied" in identity) return identity.denied;
+  const payload = await body<{ publicStats?: boolean }>(request);
+  if (typeof payload?.publicStats !== "boolean") return json({ error: "Choose whether to show Daily stats publicly" }, 400);
+  await setPublicStats(identity.player.playerId, payload.publicStats);
+  return json({ publicStats: payload.publicStats });
+}
+export async function publicRankings(request: HttpRequest) {
+  if ((request.query.get("window") ?? "30d") !== "30d") return json({ error: "Invalid ranking window" }, 400);
+  return json(await rankingsPage(request.query.get("cursor") ?? undefined));
+}
+async function voidDaily(request: HttpRequest) {
+  const unauthorized = requireAdmin(request); if (unauthorized) return unauthorized;
+  const denied = requireOrigin(request); if (denied) return denied;
+  const payload = await body<{ dailyDate?: string }>(request);
+  if (!payload?.dailyDate || !/^\d{4}-\d{2}-\d{2}$/.test(payload.dailyDate)) return json({ error: "Daily date required" }, 400);
+  return await voidDailyAssignment(payload.dailyDate) ? json({ void: true }) : json({ error: "Daily assignment not found" }, 404);
 }
 
 async function session(request: HttpRequest) {
@@ -337,7 +385,7 @@ async function adminPuzzleSuggestions(request: HttpRequest) {
 function handle(handler: (request: HttpRequest, context: InvocationContext) => Promise<HttpResponseInit>) {
   return async (request: HttpRequest, context: InvocationContext) => {
     try { return await handler(request, context); }
-    catch (error) { context.error(error); return json({ error: "The service could not complete the request" }, 500); }
+    catch (error) { if (error instanceof RankingsError) return json({ error: error.message }, error.status); if (error instanceof PlayConflictError) return json({ error: error.message }, 409); context.error(error); return json({ error: "The service could not complete the request" }, 500); }
   };
 }
 
@@ -357,3 +405,8 @@ app.http("adminPuzzle", { methods: ["GET", "PATCH", "DELETE"], authLevel: "anony
 app.http("adminFeedback", { methods: ["GET"], authLevel: "anonymous", route: "manage/feedback", handler: handle(adminFeedback) });
 app.http("adminPlayerSupport", { methods: ["GET"], authLevel: "anonymous", route: "manage/players", handler: handle(adminPlayerSupport) });
 app.http("adminPuzzleSuggestions", { methods: ["POST"], authLevel: "anonymous", route: "manage/puzzle-suggestions", handler: handle(adminPuzzleSuggestions) });
+
+app.http("myStats", { methods: ["GET"], authLevel: "anonymous", route: "players/me/stats", handler: handle(myStats) });
+app.http("playerPreferences", { methods: ["PATCH"], authLevel: "anonymous", route: "players/me/preferences", handler: handle(playerPreferences) });
+app.http("publicRankings", { methods: ["GET"], authLevel: "anonymous", route: "rankings", handler: handle(publicRankings) });
+app.http("voidDaily", { methods: ["POST"], authLevel: "anonymous", route: "manage/daily/void", handler: handle(voidDaily) });

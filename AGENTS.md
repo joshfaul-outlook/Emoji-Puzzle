@@ -10,7 +10,7 @@ The core product question is whether we can repeatedly create puzzles that feel 
 
 - One globally shared puzzle per UTC day.
 - Every new browser-tab session opens in Daily mode; Practice is an explicit session choice.
-- Daily uses the reviewed 20-puzzle rotation; Practice uses a separate append-only, player-unnumbered sequence of easier/pop-culture puzzles and never affects rankings.
+- Daily uses immutable UTC assignments initialized by deployment and never repeats a puzzle. Practice uses a separate append-only, player-unnumbered sequence of easier/pop-culture puzzles and never affects rankings.
 - No password or conventional account is required. Email verification creates and recovers one persistent named player identity; each browser receives an independent opaque session.
 - The category is hidden until a hint or the result.
 - Guesses are free-form, deterministic, and unlimited.
@@ -19,9 +19,10 @@ The core product question is whether we can repeatedly create puzzles that feel 
 - The result celebrates the explanation, not a numeric score.
 - Sharing never exposes the answer or emoji sequence.
 - Daily feedback is thumbs up/down with an optional note; Practice feedback is rating-only.
+- Public Daily rankings default on with a durable player opt-out; Practice stats are private. Rank by 30-day Daily solves, then unaided solves, with shared ranks. Daily replays never earn credit or extend streaks.
 - Daily play is server-resumable across a player's devices. Practice progression remains device-local. Public profiles do not exist.
 
-Do not add passwords, conventional account management, monetization, feeds, leaderboards, localization, fuzzy/AI answer judging, or infrastructure beyond the documented Azure production stack unless a validated need is documented first.
+Do not add passwords, conventional account management, monetization, feeds, additional competitive features, localization, fuzzy/AI answer judging, or infrastructure beyond the documented Azure production stack unless a validated need is documented first.
 
 ## Working principles
 

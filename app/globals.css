@@ -1,5 +1,45 @@
 @import "tailwindcss";
 
+.stats-dialog { width: min(680px, calc(100% - 24px)); max-height: calc(100dvh - 32px); margin: auto; padding: clamp(16px, 4vw, 28px); border: 1px solid var(--line); border-radius: 20px; color: var(--ink); background: var(--surface); box-shadow: 0 24px 80px #0003; overflow: auto; }
+.stats-dialog::backdrop { background: #24313c88; }
+.stats-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.stats-heading h2 { margin: 0; font: 600 clamp(24px, 6vw, 32px) var(--font-editorial); }
+.stats-eyebrow { color: var(--muted); font-size: 12px; margin: 0 0 5px; overflow-wrap: anywhere; }
+.stats-close { flex-shrink: 0; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); }
+.stats-tabs { display: flex; gap: 6px; margin: 24px 0; padding: 5px; background: var(--surface-muted); border-radius: 12px; }
+.stats-tabs button { flex: 1; min-height: 44px; border: 0; border-radius: 8px; background: transparent; font-weight: 700; }
+.stats-tabs button[aria-pressed="true"] { background: var(--surface); box-shadow: var(--shadow); color: var(--slate-dark); }
+.stats-filter { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 14px; }
+.stats-filter select { min-height: 44px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.streak-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
+.streak-cards > div { display: flex; flex-direction: column; gap: 4px; padding: 20px 12px; border-radius: 14px; background: var(--mist-soft); text-align: center; }
+.streak-cards strong { font-size: 36px; line-height: 1.15; color: var(--slate-dark); }
+.streak-cards span { font-size: 12px; }
+.stats-section { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 16px; }
+.stats-section h3 { margin: 0 0 12px; font-size: 19px; }
+.stats-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.stats-grid > div { padding: 12px 8px; background: var(--brand-ivory); border-radius: 10px; }
+.stats-grid dt { color: var(--muted); font-size: 11px; }
+.stats-grid dd { margin: 5px 0 0; font-size: 23px; font-weight: 700; }
+.stats-dialog p { line-height: 1.55; font-size: 14px; }
+.stats-dialog .stats-note, .stats-preference p { font-size: 12px; color: var(--muted); }
+.stats-preference { margin: 24px 0 12px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; }
+.stats-preference label { display: flex; gap: 10px; align-items: center; min-height: 44px; font-weight: 700; }
+.stats-preference input { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--brand-slate); }
+.own-rank { padding: 14px; background: var(--gold-soft); border-radius: 10px; }
+.rankings-table-wrap { max-width: 100%; }
+.rankings-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: clamp(10px, 2.5vw, 13px); }
+.rankings-table caption { text-align: left; padding: 12px 0; font-weight: 700; }
+.rankings-table th, .rankings-table td { padding: 12px 3px; border-bottom: 1px solid var(--line); text-align: center; overflow-wrap: anywhere; }
+.rankings-table th:nth-child(2) { width: 34%; text-align: left; }
+.rankings-table th:first-child { width: 12%; }
+.rankings-table thead th { white-space: nowrap; overflow-wrap: normal; font-size: 10px; padding-inline: 1px; }
+.player-stats-button { display: flex; align-items: center; gap: 5px; }
+.player-chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.stats-dialog .secondary-button { min-height: 44px; margin-top: 12px; }
+.daily-streak { color: var(--slate-dark); font-weight: 700; }
+.stats-dialog :focus-visible { outline: 3px solid var(--brand-slate); outline-offset: 3px; }
+
 :root {
   --brand-slate: #556b80;
   --brand-mist: #89b6b0;

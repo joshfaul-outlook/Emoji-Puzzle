@@ -18,6 +18,22 @@ The editor’s AI help uses `OPENAI_API_KEY` server-side and returns reviewable 
 
 The emoji helper searches a bundled dataset locally. `Use suggested` replaces the current sequence, `Copy` copies the suggestion, `Undo` restores the previous sequence, and the emoji field always remains manually editable.
 
+## Daily rankings rollout and operation
+
+Private stats are available from the player's **Stats** control. Public Daily stats default on, with a durable opt-out. Practice and shared challenge stats always remain private. Daily ranking order is solves over today plus the prior 29 UTC dates, then unaided solves; equal totals share ranks. Current and best Daily solve streaks use all eligible history from rankings launch.
+
+Rankings activate with deployment. The workflow's production smoke test requests the current Daily puzzle, which atomically stores that UTC date as the rankings epoch and freezes the first nonrepeating assignment. Later deployments reuse the persisted epoch; there is no rankings launch-date setting to manage. Supply new authored Daily records beyond the exposed test fixture as development continues. Do not relabel exposed Practice puzzles as fresh Daily content or reset player data to create eligibility.
+
+On the first request at or after launch, the server reserves historical content from known plays, published Practice, and served original test-fixture Daily puzzles. Each issued Daily date stores a frozen puzzle snapshot and an atomic puzzle reservation in `PuzzleCatalog` / `DailySchedule`. Each player retains the same canonical player + puzzle attempt. Catalog edits, reordering, and archival cannot alter an already-issued puzzle. Requests to author previews require the existing admin session; preview attempts never qualify for rank.
+
+Fresh Daily inventory never wraps. If exhausted, the API returns `503` with `DAILY_UNAVAILABLE`, records a void date, and logs a Daily inventory warning. Practice remains accessible. Replenish inventory for the next UTC date; the void date stays fixed. Configure an operational alert for that warning in the existing hosting diagnostics before public launch. Do not reseed or erase schedule reservations to refill ranked inventory. Missed past dates without an assignment break streaks; explicitly void dates neither extend nor break them.
+
+For a material error in an issued puzzle, an authenticated admin can send a same-origin `POST /api/manage/daily/void` with JSON `{ "dailyDate": "YYYY-MM-DD" }`. This permanently voids that assignment for ranking and streak calculations; it does not erase plays, free its puzzle reservation, or replace the puzzle mid-day. Public reads refuse an invalidated snapshot until a fresh one is available. Review the date before invoking this operation.
+
+Rankings use HTTP-triggered refreshes because managed Static Web Apps does not support timer triggers. The first board/stats request after five minutes refreshes a persisted snapshot under a storage lease; concurrent readers get the last complete compatible board or a temporary updating response. Every response displays its actual `asOf` time. Preference filtering is live and `no-store`, including pagination; opt-out takes effect without waiting for a rebuild. A changed snapshot or public roster invalidates old cursors (`409`); refresh the board from the beginning. Snapshot failure does not prevent saving a play or loading private totals.
+
+Snapshots use `PuzzleCatalog` partitions `Rankings` (lease/pointer) and `RankingSnapshot:<id>` (chunks). Rebuilds derive from canonical `PuzzlePlays` records, never feedback or incremental score counters. V1 caps rebuilds at 100,000 plays and 10,000 ranked players. Measure production scan duration and add a date index before reaching those bounds. A failed rebuild leaves the last complete snapshot and a server diagnostic. The lease expires after five minutes. Interrupted unpublished builds can leave orphan chunks; remove only partitions confirmed unreferenced by the current pointer and inactive builds. Never delete `DailySchedule` or original play facts as cache maintenance.
+
 ## Data migration and recovery
 
 `npm run seed` is idempotent and preserves the original Daily 20 and shuffled Practice 330 positions. Once `catalog-v1` is recorded, later deployments do not overwrite admin edits.

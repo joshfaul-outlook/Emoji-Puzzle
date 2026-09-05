@@ -128,6 +128,7 @@ export async function updatePuzzle(existing: StoredPuzzle, input: Partial<Stored
 
 export type PlayerRecord = {
   playerId: string;
+  publicStats: boolean;
   displayName: string;
   normalizedDisplayName: string;
   recoveryEmailKey: string;
@@ -208,6 +209,7 @@ export async function createPlayerWithSession(input: {
   const now = new Date().toISOString();
   const record: PlayerRecord = {
     playerId: input.playerId,
+    publicStats: true,
     displayName: input.displayName,
     normalizedDisplayName: input.normalizedDisplayName,
     recoveryEmailKey: input.recoveryEmailKey,
@@ -232,7 +234,7 @@ export async function createPlayerWithSession(input: {
 export async function getPlayer(playerId: string) {
   try {
     const entity = await playerTable().getEntity<PlayerEntity>("Players", `player:${playerId}`);
-    return { playerId: entity.playerId, displayName: entity.displayName, normalizedDisplayName: entity.normalizedDisplayName, recoveryEmailKey: entity.recoveryEmailKey, recoveryVerifiedAt: entity.recoveryVerifiedAt, createdAt: entity.createdAt, lastSeenAt: entity.lastSeenAt } satisfies PlayerRecord;
+    return { playerId: entity.playerId, publicStats: entity.publicStats !== false, displayName: entity.displayName, normalizedDisplayName: entity.normalizedDisplayName, recoveryEmailKey: entity.recoveryEmailKey, recoveryVerifiedAt: entity.recoveryVerifiedAt, createdAt: entity.createdAt, lastSeenAt: entity.lastSeenAt } satisfies PlayerRecord;
   } catch (error) {
     if ((error as { statusCode?: number }).statusCode === 404) return null;
     throw error;
@@ -243,6 +245,19 @@ export async function touchPlayer(player: PlayerRecord) {
   const lastSeenAt = new Date().toISOString();
   await playerTable().updateEntity({ partitionKey: "Players", rowKey: `player:${player.playerId}`, lastSeenAt }, "Merge", { etag: "*" });
   return { ...player, lastSeenAt };
+}
+
+export async function listRankingPlayers() {
+  const players: { playerId: string; displayName: string; publicStats: boolean }[] = [];
+  for await (const entity of playerTable().listEntities<PlayerEntity>({ queryOptions: {
+    filter: "PartitionKey eq 'Players' and RowKey ge 'player:' and RowKey lt 'player;'",
+    select: ["playerId", "displayName", "publicStats"],
+  } })) players.push({ playerId: entity.playerId, displayName: entity.displayName, publicStats: entity.publicStats !== false });
+  return players;
+}
+
+export async function setPublicStats(playerId: string, publicStats: boolean) {
+  await playerTable().updateEntity({ partitionKey: "Players", rowKey: `player:${playerId}`, publicStats }, "Merge", { etag: "*" });
 }
 
 export async function getPlayerByEmailKey(emailKey: string) {
@@ -383,12 +398,13 @@ export type PuzzlePlay = {
   playerId: string; playId: string; puzzleId: string; puzzleNumber: number; pool: PuzzlePool; context: PlayContext; rankingEligible: boolean;
   startedAt: string; lastActionAt: string; completedAt: string | null; guessCount: number; hintCount: number;
   outcome: "playing" | "solved" | "revealed"; feedbackSubmittedAt: string | null; createdAt: string; updatedAt: string;
+  dailyDate?: string; puzzleRevision?: string; rankingOutcome?: "pending" | "solved" | "revealed" | "late" | "ineligible";
 };
 
 type PlayEntity = TableEntity & Omit<PuzzlePlay, "completedAt" | "feedbackSubmittedAt"> & { completedAt?: string; feedbackSubmittedAt?: string };
 
 function fromPlayEntity(entity: PlayEntity): PuzzlePlay {
-  return { playerId: entity.playerId, playId: entity.playId, puzzleId: entity.puzzleId, puzzleNumber: entity.puzzleNumber, pool: entity.pool, context: entity.context, rankingEligible: entity.rankingEligible, startedAt: entity.startedAt, lastActionAt: entity.lastActionAt, completedAt: entity.completedAt ?? null, guessCount: entity.guessCount, hintCount: entity.hintCount, outcome: entity.outcome, feedbackSubmittedAt: entity.feedbackSubmittedAt ?? null, createdAt: entity.createdAt, updatedAt: entity.updatedAt };
+  return { playerId: entity.playerId, playId: entity.playId, puzzleId: entity.puzzleId, puzzleNumber: entity.puzzleNumber, pool: entity.pool, context: entity.context, rankingEligible: entity.rankingEligible, startedAt: entity.startedAt, lastActionAt: entity.lastActionAt, completedAt: entity.completedAt ?? null, guessCount: entity.guessCount, hintCount: entity.hintCount, outcome: entity.outcome, feedbackSubmittedAt: entity.feedbackSubmittedAt ?? null, createdAt: entity.createdAt, updatedAt: entity.updatedAt, ...(entity.dailyDate ? { dailyDate: entity.dailyDate } : {}), ...(entity.puzzleRevision ? { puzzleRevision: entity.puzzleRevision } : {}), ...(entity.rankingOutcome ? { rankingOutcome: entity.rankingOutcome } : {}) };
 }
 
 function playEntity(play: PuzzlePlay) {
@@ -403,6 +419,18 @@ export function canonicalDailyPlayId(puzzleId: string) {
 export async function getPlay(playerId: string, playId: string) {
   try { return fromPlayEntity(await playTable().getEntity<PlayEntity>(playerId, `play:${playId}`)); }
   catch (error) { if ((error as { statusCode?: number }).statusCode === 404) return null; throw error; }
+}
+
+export async function listPlays(playerId?: string, limit = 100_000) {
+  const rows: PuzzlePlay[] = [];
+  const partition = playerId ? `PartitionKey eq '${playerId.replaceAll("'", "''")}' and ` : "";
+  for await (const entity of playTable().listEntities<PlayEntity>({ queryOptions: {
+    filter: `${partition}RowKey ge 'play:' and RowKey lt 'play;'`,
+  } })) {
+    if (rows.length >= limit) throw new Error("Play history exceeds the snapshot scan limit; add a date index before increasing it");
+    rows.push(fromPlayEntity(entity));
+  }
+  return rows;
 }
 
 export async function startPlay(input: Omit<PuzzlePlay, "startedAt" | "lastActionAt" | "completedAt" | "guessCount" | "hintCount" | "outcome" | "feedbackSubmittedAt" | "createdAt" | "updatedAt">) {
@@ -429,16 +457,21 @@ export async function markFeedbackSubmitted(playerId: string, playId: string) {
   return submittedAt;
 }
 
-type PlayAction = { playerId: string; playId: string; puzzleId: string; pool: PuzzlePool; operationId: string; kind: "guess" | "hint" | "reveal"; correct?: boolean; hintIndex?: number };
+type PlayAction = { playerId: string; playId: string; puzzleId: string; pool: PuzzlePool; operationId: string; kind: "guess" | "hint" | "reveal"; correct?: boolean; hintIndex?: number; fingerprint?: string };
 
-export async function applyPlayAction(action: PlayAction) {
+export async function applyPlayAction(action: PlayAction, clock: () => Date = () => new Date()) {
   const actionRowKey = `action:${action.playId}:${action.operationId}`;
+  const actionSignature = createHash("sha256").update(JSON.stringify([action.kind, action.puzzleId, action.pool, action.hintIndex ?? null, action.correct ?? null, action.fingerprint ?? null])).digest("hex");
+  const repeatedAction = async () => {
+    const stored = await playTable().getEntity(action.playerId, actionRowKey);
+    if (stored.actionSignature !== actionSignature) throw new PlayConflictError("Operation ID belongs to another action");
+    const repeated = await getPlay(action.playerId, action.playId);
+    if (!repeated) throw new PlayConflictError("Play not found");
+    return { play: repeated, repeated: true };
+  };
   for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
-      await playTable().getEntity(action.playerId, actionRowKey);
-      const repeated = await getPlay(action.playerId, action.playId);
-      if (!repeated) throw new PlayConflictError("Play not found");
-      return { play: repeated, repeated: true };
+      return await repeatedAction();
     } catch (error) {
       if ((error as { statusCode?: number }).statusCode !== 404) throw error;
     }
@@ -448,7 +481,7 @@ export async function applyPlayAction(action: PlayAction) {
     });
     if (entity.puzzleId !== action.puzzleId || entity.pool !== action.pool) throw new PlayConflictError("Play does not match puzzle");
     if (entity.outcome !== "playing") throw new PlayConflictError("Play is already complete");
-    const now = new Date().toISOString();
+    const now = clock().toISOString();
     const next = fromPlayEntity(entity);
     next.lastActionAt = now; next.updatedAt = now;
     if (action.kind === "guess") {
@@ -458,16 +491,19 @@ export async function applyPlayAction(action: PlayAction) {
       if (action.hintIndex === undefined || action.hintIndex > next.hintCount) throw new PlayConflictError("Hints must be requested in order");
       next.hintCount = Math.max(next.hintCount, action.hintIndex + 1);
     } else { next.outcome = "revealed"; next.completedAt = now; }
+    if (next.outcome !== "playing") {
+      next.rankingOutcome = !next.rankingEligible || !next.dailyDate || !next.puzzleRevision
+        ? "ineligible"
+        : now.slice(0, 10) !== next.dailyDate ? "late" : next.outcome;
+    }
     const transaction = new TableTransaction();
     transaction.updateEntity(playEntity(next), "Replace", { etag: entity.etag });
-    transaction.createEntity({ partitionKey: action.playerId, rowKey: actionRowKey, playId: action.playId, kind: action.kind, createdAt: now });
+    transaction.createEntity({ partitionKey: action.playerId, rowKey: actionRowKey, playId: action.playId, kind: action.kind, actionSignature, createdAt: now });
     try { await playTable().submitTransaction(transaction.actions); return { play: next, repeated: false }; }
     catch (error) {
       const status = (error as { statusCode?: number }).statusCode;
       if (status === 409) {
-        const repeated = await getPlay(action.playerId, action.playId);
-        if (!repeated) throw new PlayConflictError("Play not found");
-        return { play: repeated, repeated: true };
+        return repeatedAction();
       }
       if (status !== 412) throw error;
     }

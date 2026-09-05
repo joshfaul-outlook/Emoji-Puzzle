@@ -17,11 +17,14 @@ export function GameLoader({ mode }: { mode: LoaderMode }) {
     parameters.set("mode", mode);
     fetch(`/api/puzzles/current?${parameters.toString()}`, { headers: { accept: "application/json" } })
       .then(async (response) => {
-        if (!response.ok) throw new Error("Puzzle unavailable");
+        if (!response.ok) {
+          const failure = await response.json().catch(() => null) as { error?: string } | null;
+          throw new Error(failure?.error ?? "The puzzle could not load. Please try again.");
+        }
         return response.json() as Promise<{ puzzle: PublicPuzzle; nextPuzzleNumber?: number }>;
       })
       .then(setResult)
-      .catch(() => setError("The puzzle could not load. Please check your connection and try again."));
+      .catch((failure) => setError(failure instanceof Error ? failure.message : "The puzzle could not load. Please try again."));
   }, [mode]);
 
   if (error) {
@@ -31,6 +34,7 @@ export function GameLoader({ mode }: { mode: LoaderMode }) {
         <h1>Puzzle temporarily unavailable</h1>
         <p>{error}</p>
         <button className="primary-button" type="button" onClick={() => window.location.reload()}>Try again</button>
+        <a href="/practice/">Play Practice</a>
       </main>
     );
   }

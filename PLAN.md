@@ -22,6 +22,13 @@ Azure Table Storage is the production source of truth for puzzles, player-name r
 - Layouts work without horizontal overflow from 320px through desktop, in portrait and landscape.
 - The generated Azure hostname passes HTTPS smoke tests before any custom-domain change.
 
+## Player stats and rankings
+
+Implemented [Player Rankings and Private Stats](docs/PLAYER_RANKINGS_FEATURE_PLAN.md): private Daily/Practice summaries, current/best Daily streaks, public Daily rankings, and a default-on public preference with opt-out. Deployment initializes an immutable, nonrepeating Daily schedule and rankings epoch; legacy/test results are excluded. The public board uses a persisted snapshot refreshed on demand at most every five minutes, matching the managed Azure HTTP-only API.
+
+The first Daily request after deployment stores the rankings launch date and freezes that day's assignment. Later deployments reuse the persisted epoch. No separate launch-date setting or production data reset is required.
+
 ## Deferred work
 
-Passwords, conventional account management, public profiles, rankings formulas/UI, roles, audit logs, bulk operations, hard deletion, fuzzy judging, monetization, leaderboards, localization, and full cross-device Practice synchronization remain out of scope until usage establishes a need.
+
+Passwords, conventional account management, public profiles, alternate ranking formulas, roles, audit logs, bulk operations, hard deletion, fuzzy judging, monetization, additional competitive features, localization, and full cross-device Practice synchronization remain out of scope until usage establishes a need.

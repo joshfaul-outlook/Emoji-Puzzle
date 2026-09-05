@@ -24,6 +24,7 @@ import { feedbackPlayFields } from "../lib/feedback-payload";
 import { playerHeaders, type PlayerIdentity } from "../lib/player-identity";
 import { BrandWordmark } from "./components/BrandWordmark";
 import { KnowingMark } from "./components/KnowingMark";
+import { DailyStreak, PlayerStatsPanel } from "./PlayerStats";
 
 const SESSION_KEY = "emoji-daily-anonymous-session";
 
@@ -76,6 +77,7 @@ export function DailyPuzzle({
   const [hydratedPuzzleId, setHydratedPuzzleId] = useState<string | null>(null);
   const [nextPuzzleCountdown, setNextPuzzleCountdown] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "shared" | "copied" | "error">("idle");
   const [nativeSharingAvailable, setNativeSharingAvailable] = useState(false);
   const [rating, setRating] = useState<"up" | "down" | null>(null);
@@ -84,6 +86,8 @@ export function DailyPuzzle({
   const [playStorageKey, setPlayStorageKey] = useState<string | null>(null);
   const [trackingState, setTrackingState] = useState<"starting" | "ready" | "error">("starting");
   const [trackingRetry, setTrackingRetry] = useState(0);
+  const [trackingMessage, setTrackingMessage] = useState("");
+  const [dailyChanged, setDailyChanged] = useState(false);
   const pendingGuess = useRef<{ guess: string; operationId: string } | null>(null);
   const [practiceProgress, setPracticeProgress] = useState<PracticeProgress>({ position: 1, cycle: 0 });
   const inputRef = useRef<HTMLInputElement>(null);
@@ -142,6 +146,8 @@ export function DailyPuzzle({
       setFeedbackState("idle");
       setHydratedPuzzleId(puzzle.id);
       setTrackingState("starting");
+      setTrackingMessage("");
+      setDailyChanged(false);
     }, 0);
     return () => window.clearTimeout(task);
   }, [challengeBenchmark, puzzle, resumePractice]);
@@ -156,7 +162,11 @@ export function DailyPuzzle({
       body: JSON.stringify({ playId: play.playId, puzzleId: puzzle.id, pool: puzzle.pool, context: puzzle.context }),
     }).then(async (response) => {
       if (response.status === 401) { invalidateIdentity(); return; }
-      if (!response.ok) throw new Error("play start failed");
+      if (!response.ok) {
+        const failure = await response.json().catch(() => null) as { error?: string; code?: string } | null;
+        if (failure?.code === "DAILY_CHANGED") setDailyChanged(true);
+        throw new Error(failure?.error ?? "Check your connection and try again.");
+      }
       const data = await response.json() as { play: Pick<PlayState, "guessCount" | "outcome" | "playId"> & { hintCount: number; feedbackSubmittedAt?: string | null }; hints?: string[]; resolution?: Resolution };
       setPlay((current) => ({
         ...current,
@@ -168,7 +178,7 @@ export function DailyPuzzle({
         feedbackSent: Boolean(data.play.feedbackSubmittedAt) || current.feedbackSent,
       }));
       setTrackingState("ready");
-    }).catch((error) => { if (error?.name !== "AbortError") setTrackingState("error"); });
+    }).catch((error) => { if (error?.name !== "AbortError") { setTrackingMessage(error.message); setTrackingState("error"); } });
     return () => controller.abort();
   }, [hydratedPuzzleId, identity, invalidateIdentity, play.playId, playStorageKey, puzzle.context, puzzle.id, puzzle.pool, trackingRetry]);
 
@@ -496,8 +506,10 @@ export function DailyPuzzle({
     <main className="utility-page" aria-busy={trackingState === "starting"}>
       <KnowingMark size={64} />
       <h1>{trackingState === "error" ? "Your play couldn’t start" : "Saving your place…"}</h1>
-      <p>{trackingState === "error" ? "Check your connection and try again." : "Just a moment."}</p>
-      {trackingState === "error" && <button className="primary-button" type="button" onClick={() => { setTrackingState("starting"); setTrackingRetry((value) => value + 1); }}>Try again</button>}
+      <p>{trackingState === "error" ? trackingMessage || "Check your connection and try again." : "Just a moment."}</p>
+      {trackingState === "error" && (dailyChanged
+        ? <button className="primary-button" type="button" onClick={() => switchMode("daily")}>Open today’s Daily</button>
+        : <button className="primary-button" type="button" onClick={() => { setTrackingState("starting"); setTrackingRetry((value) => value + 1); }}>Try again</button>)}
     </main>
   );
 
@@ -517,9 +529,11 @@ export function DailyPuzzle({
             </svg>
             <span>Share</span>
           </button>
-          <span className="player-chip" title="Player name">{identity.displayName}</span>
+          <button className="player-chip player-stats-button" type="button" onClick={() => setStatsOpen(true)} aria-label={`Stats & rankings for ${identity.displayName}`} title="Stats & rankings"><span className="player-chip-name">{identity.displayName}</span><span>Stats</span></button>
         </div>
       </header>
+
+      {statsOpen && <PlayerStatsPanel identity={identity} onClose={() => setStatsOpen(false)} />}
 
       <nav className="mode-switch" aria-label="Game mode">
         <button
@@ -649,6 +663,7 @@ export function DailyPuzzle({
           <div className="category-pill">{play.resolution?.category}</div>
           <h1 id="result-title">{play.resolution?.answer}</h1>
           <p className="explanation">{play.resolution?.explanation}</p>
+          {puzzle.context === "daily" && <DailyStreak identity={identity} />}
 
           <div className="result-stats" aria-label="Your result">
             <div><strong>{play.guessCount}</strong><span>{play.guessCount === 1 ? "guess" : "guesses"}</span></div>

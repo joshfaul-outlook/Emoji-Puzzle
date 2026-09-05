@@ -38,9 +38,13 @@ The MVP exists to test that hypothesis, not to prove a complete business model.
 
 ## Gameplay modes
 
-- **Daily** remains the default on every new browser-tab session. Everyone receives the same UTC puzzle from the 20-puzzle Daily rotation, and only this context is eligible for future rankings.
+- **Daily** remains the default on every new browser-tab session. Everyone receives the same puzzle from an immutable, nonrepeating UTC schedule initialized by deployment. Only original, on-time Daily solves count toward public rankings.
 - **Practice** is selected explicitly and resumes device-local progress through an append-only sequence: the former puzzles 21–100 plus 250 easier, pop-culture-focused additions. It wraps with fresh attempts, hides sequence numbers from players, and collects thumbs-only feedback.
 - Shared Practice links open standalone, spoiler-free challenges without changing either player’s saved Practice position.
+
+## Player statistics and Daily rankings
+
+Players can view separate Daily, Practice, and Practice-challenge history through their player-name Stats control. Daily stats include current and best solve streaks. Public rankings use the last 30 UTC dates: most eligible Daily solves, then most solves without hints, with shared ranks. Public Daily stats default to yes; a player can opt out across all their devices. Practice is always private. Repeated Daily puzzles never count, and the launch schedule never wraps.
 
 ## What success looks like in this phase
 
@@ -64,7 +68,7 @@ This starting point does not attempt to build:
 
 - passwords, conventional accounts, public profiles, or generalized cross-device Practice synchronization;
 - monetization or subscriptions;
-- social feeds, comments, or competitive leaderboards;
+- social feeds, comments, or competitive features beyond the Daily rankings;
 - player-facing accounts or social content management;
 - AI or fuzzy answer adjudication;
 - localization;
