@@ -8,7 +8,9 @@ export type DailyAssignment = {
   void: boolean; reason?: string; puzzle: StoredPuzzle | null;
 };
 type AssignmentEntity = TableEntity & { assignmentJson: string };
+type InitializationEntity = TableEntity & { launchDate: string; scheduleVersion?: number };
 const partitionKey = "DailySchedule";
+const scheduleVersion = 2;
 export const utcDate = (now: Date) => now.toISOString().slice(0, 10);
 export function puzzleRevision(puzzle: StoredPuzzle) {
   return createHash("sha256").update(JSON.stringify([puzzle.id, puzzle.emoji, puzzle.answer, puzzle.acceptedAnswers, puzzle.category, puzzle.hints, puzzle.explanation])).digest("hex");
@@ -31,25 +33,48 @@ export async function listDailyAssignments() {
 
 // All reservations and date rows use one partition, so issuing a date and
 // consuming its puzzle is one atomic transaction across concurrent hosts.
+async function migrateFailedInitialActivation(initialized: InitializationEntity) {
+  const assignments = await listDailyAssignments();
+  const isFailedInitialActivation = assignments.length === 1 && assignments[0].dailyDate === initialized.launchDate && assignments[0].void && assignments[0].reason === "inventory-exhausted";
+  if (!isFailedInitialActivation) throw new Error("Daily schedule requires an explicit data migration");
+  const rows: string[] = [];
+  for await (const row of puzzleTable().listEntities({ queryOptions: { filter: `PartitionKey eq '${partitionKey}'` } })) {
+    if (row.rowKey && row.rowKey !== "initialized") rows.push(row.rowKey);
+  }
+  for (let i = 0; i < rows.length; i += 100) {
+    const transaction = new TableTransaction();
+    for (const rowKey of rows.slice(i, i + 100)) transaction.deleteEntity(partitionKey, rowKey);
+    try { await puzzleTable().submitTransaction(transaction.actions); }
+    catch (error) { if ((error as { statusCode?: number }).statusCode !== 404) throw error; }
+  }
+  await puzzleTable().deleteEntity(partitionKey, "initialized").catch((error) => {
+    if ((error as { statusCode?: number }).statusCode !== 404) throw error;
+  });
+}
+
 async function initializeSchedule(launch: string) {
-  const initialized = await optionalEntity<TableEntity & { launchDate: string }>("initialized");
-  if (initialized) return initialized.launchDate;
+  const initialized = await optionalEntity<InitializationEntity>("initialized");
+  if (initialized?.scheduleVersion === scheduleVersion) return initialized.launchDate;
+  // The first deployment used a conservative retirement rule and could only
+  // persist an exhausted void. Upgrade that failed, playless activation once.
+  if (initialized) await migrateFailedInitialActivation(initialized);
   const [catalog, plays] = await Promise.all([listPuzzles(), listPlays()]);
-  const known = new Set(plays.filter((p) => p.context !== "author-test").map((p) => p.puzzleId));
-  // Legacy scheduling had no assignment ledger. Conservatively retire its
-  // existing rotation and all published Practice content, never invent history.
+  const known = new Set(plays.filter((p) => p.context === "practice" || p.context === "challenge").map((p) => p.puzzleId));
+  // Predeployment Daily plays remain private, unranked history. The deployment
+  // epoch starts the authoritative nonrepeating schedule. Practice exposure is
+  // still permanent and prevents relabeling a Practice puzzle as ranked Daily.
   for (const p of catalog) {
-    if (p.pool === "practice" && p.status === "published" || p.pool === "daily" && p.number <= 20) known.add(p.id);
+    if (p.pool === "practice" && p.status === "published") known.add(p.id);
   }
   for (const id of known) {
     await puzzleTable().createEntity({ partitionKey, rowKey: `puzzle:${id}`, dailyDate: "prelaunch" }).catch((error) => {
       if ((error as { statusCode?: number }).statusCode !== 409) throw error;
     });
   }
-  await puzzleTable().createEntity({ partitionKey, rowKey: "initialized", launchDate: launch }).catch((error) => {
+  await puzzleTable().createEntity({ partitionKey, rowKey: "initialized", launchDate: launch, scheduleVersion }).catch((error) => {
     if ((error as { statusCode?: number }).statusCode !== 409) throw error;
   });
-  const final = await optionalEntity<TableEntity & { launchDate: string }>("initialized");
+  const final = await optionalEntity<InitializationEntity>("initialized");
   if (!final) throw new Error("Daily schedule initialization was not persisted");
   return final.launchDate;
 }

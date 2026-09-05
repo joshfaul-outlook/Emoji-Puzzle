@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import azureFunctions from "@azure/functions";
 const { HttpRequest, InvocationContext } = azureFunctions;
 import { TableClient } from "@azure/data-tables";
-import { createPlayerWithSession, createPuzzle, applyPlayAction, getPlayer, setPublicStats, listPlays, startPlay, playerTable, updatePuzzle } from "../dist/src/storage.js";
+import { createPlayerWithSession, createPuzzle, applyPlayAction, getPlayer, setPublicStats, listPlays, startPlay, playerTable, puzzleTable, updatePuzzle } from "../dist/src/storage.js";
 import { hashPlayerToken } from "../dist/src/player-identity.js";
 import { ensureDailyAssignment, getDailyAssignment, getRankingsLaunchDate, voidDailyAssignment, recordPublicExposure } from "../dist/src/daily-schedule.js";
 import { playerStats, rankingsPage } from "../dist/src/rankings.js";
@@ -34,6 +34,9 @@ test("rankings storage, schedule and authenticated API integration", async (t) =
   const second = await createPuzzle(authored("Second answer"));
   let day1;
   await t.test("date and puzzle reservations are atomic and snapshots survive edits", async () => {
+    await puzzleTable().createEntity({ partitionKey: "DailySchedule", rowKey: "initialized", launchDate: "2090-01-01" });
+    await puzzleTable().createEntity({ partitionKey: "DailySchedule", rowKey: `puzzle:${first.id}`, dailyDate: "prelaunch" });
+    await puzzleTable().createEntity({ partitionKey: "DailySchedule", rowKey: "date:2090-01-01", assignmentJson: JSON.stringify({ dailyDate: "2090-01-01", puzzleId: null, revision: null, void: true, reason: "inventory-exhausted", puzzle: null }) });
     const results = await Promise.all(Array.from({ length: 4 }, () => ensureDailyAssignment(new Date("2090-01-01T12:00:00Z"))));
     assert.equal(new Set(results.map((r) => r.puzzleId)).size, 1);
     day1 = results[0]; assert.equal(day1.puzzleId, first.id);
