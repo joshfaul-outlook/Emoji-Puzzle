@@ -40,7 +40,7 @@
 .player-chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .stats-dialog .secondary-button { min-height: 44px; margin-top: 12px; }
 .daily-streak { color: var(--slate-dark); font-weight: 700; }
-.progress-strip { width: min(100%, 440px); min-height: 46px; margin: 0 auto 10px; display: grid; grid-template-columns: 1fr 1fr auto; align-items: center; gap: 8px; border: 0; border-radius: 13px; padding: 7px 9px 7px 13px; background: color-mix(in srgb, var(--mist-soft) 78%, var(--surface)); text-align: left; }
+.progress-strip { width: min(100%, 440px); min-height: 46px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr auto; align-items: center; gap: 8px; border: 0; border-radius: 13px; padding: 7px 9px 7px 13px; background: color-mix(in srgb, var(--mist-soft) 78%, var(--surface)); text-align: left; }
 .progress-strip.metric-sentence { grid-template-columns: 1fr auto; }
 .progress-item { min-width: 0; display: flex; align-items: center; gap: 7px; }
 .progress-icon { font-size: 17px; }
@@ -263,7 +263,7 @@ input, textarea, select { font-size: 16px; }
 
 .mode-switch {
   width: fit-content;
-  margin: 16px auto -18px;
+  margin: 16px auto 12px;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   border: 1px solid var(--line);
@@ -303,6 +303,9 @@ input, textarea, select { font-size: 16px; }
   box-shadow: var(--shadow);
   text-align: center;
 }
+
+.progress-strip + .play-card,
+.progress-strip + .result-card { margin-top: 12px; }
 
 .puzzle-card-number {
   position: absolute;
@@ -713,7 +716,8 @@ footer span:first-child { color: var(--ink); font-family: Georgia, serif; font-s
   .player-chip { max-width: 88px; padding-inline: 8px; }
   .puzzle-card-number { min-height: 26px; padding: 4px 7px; font-size: 11px; letter-spacing: .03em; }
   .play-card, .result-card { margin-top: 23px; padding-inline: 16px; border-radius: 22px; }
-  .mode-switch { margin-top: 12px; margin-bottom: -10px; }
+  .mode-switch { margin-top: 12px; margin-bottom: 10px; }
+  .progress-strip + .play-card, .progress-strip + .result-card { margin-top: 10px; }
   .streak-cards.has-rank { grid-template-columns: 1fr 1fr; }
   .streak-cards.has-rank .rank-card { grid-column: 1 / -1; flex-direction: row; align-items: baseline; justify-content: center; }
   .play-card { padding-top: 27px; }
