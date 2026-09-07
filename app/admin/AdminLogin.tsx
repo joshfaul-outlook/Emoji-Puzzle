@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import { dismissAdminKeyboard, dismissKeyboardForAdminAction } from "../../lib/admin-ui";
 
 export function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
   const [password, setPassword] = useState("");
@@ -10,6 +11,7 @@ export function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    dismissAdminKeyboard();
     setBusy(true);
     setError("");
     const response = await fetch("/api/manage/session", {
@@ -27,7 +29,7 @@ export function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
   }
 
   return (
-    <main className="admin-login-shell">
+    <main className="admin-login-shell" onClickCapture={(event) => dismissKeyboardForAdminAction(event.target)}>
       <form className="admin-login-card" onSubmit={submit}>
         <Link className="brand" href="/">emojizzle</Link>
         <p className="admin-eyebrow">Puzzle administration</p>

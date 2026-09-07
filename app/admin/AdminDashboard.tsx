@@ -5,6 +5,7 @@ import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { AdminPuzzle } from "../../lib/admin-types";
+import { dismissAdminKeyboard, dismissKeyboardForAdminAction } from "../../lib/admin-ui";
 import { AdminHeader } from "./AdminHeader";
 import { AdminLogin } from "./AdminLogin";
 
@@ -47,9 +48,18 @@ export function AdminDashboard() {
     }
     return a.position - b.position || a.number - b.number;
   }), [history, pool, puzzles, query]);
+  useEffect(() => {
+    if (auth !== "signed-in" || !window.location.hash) return;
+    const task = window.setTimeout(() => {
+      const anchor = decodeURIComponent(window.location.hash.slice(1));
+      document.getElementById(anchor)?.scrollIntoView({ block: "center" });
+    }, 0);
+    return () => window.clearTimeout(task);
+  }, [auth, visible.length]);
   const canReorder = !moving && !deleting;
 
   async function movePuzzle(id: string, targetId: string, dropAfter = false) {
+    dismissAdminKeyboard();
     if (!canReorder || id === targetId || moving) return;
     const source = puzzles.find((item) => item.id === id); const target = puzzles.find((item) => item.id === targetId);
     if (!source || !target || source.readOnly || target.readOnly || source.pool !== target.pool) return;
@@ -81,6 +91,7 @@ export function AdminDashboard() {
   }
 
   async function deletePuzzle(puzzle: AdminPuzzle) {
+    dismissAdminKeyboard();
     if (deleting || puzzle.readOnly || !window.confirm(`Delete “${puzzle.answer}”? This cannot be undone.`)) return;
     setDeleting(puzzle.id); setError("");
     try {
@@ -95,7 +106,7 @@ export function AdminDashboard() {
   if (auth === "signed-out") return <AdminLogin onSuccess={() => void load()} />;
 
   return (
-    <main className="admin-shell">
+    <main className="admin-shell" onClickCapture={(event) => dismissKeyboardForAdminAction(event.target)}>
       <AdminHeader title="Puzzles" />
       <section className="admin-toolbar">
         <div><p className="admin-eyebrow">Puzzle catalog</p><h1>Shape the next “aha.”</h1><p>{puzzles.length} puzzles in Azure Table Storage</p></div>
@@ -165,7 +176,7 @@ function SortablePuzzleRow({ puzzle, disabled, deleting, onDelete, returnTo }: {
     suppressClick.current = false;
   }
 
-  return <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={`puzzle-row-swipe ${isDragging ? "is-moving" : ""} ${swiping ? "is-swiping" : ""} ${puzzle.readOnly ? "is-read-only" : ""}`} onTouchStart={touchStart} onTouchMove={touchMove} onTouchEnd={touchEnd} onTouchCancel={touchCancel}>
+  return <div id={`puzzle-${puzzle.number}`} ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={`puzzle-row-swipe ${isDragging ? "is-moving" : ""} ${swiping ? "is-swiping" : ""} ${puzzle.readOnly ? "is-read-only" : ""}`} onTouchStart={touchStart} onTouchMove={touchMove} onTouchEnd={touchEnd} onTouchCancel={touchCancel}>
     {!puzzle.readOnly && <span className="swipe-delete-action" aria-hidden="true">{deleting ? "Deleting…" : "Delete"}</span>}
     <div className="puzzle-row" style={{ transform: `translateX(${swipe}px)` }}>
       <button className="drag-handle" type="button" aria-label={`Drag ${puzzle.answer} to reorder`} disabled={disabled} {...attributes} {...listeners}>⠿</button>

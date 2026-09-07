@@ -28,6 +28,7 @@ import {
 } from "../lib/play-state.ts";
 import { PLAYER_IDENTITY_KEY, normalizePlayerName, playerHeaders, readPlayerIdentity, savePlayerIdentity } from "../lib/player-identity.ts";
 import { applyGameDataEpoch, GAME_DATA_EPOCH, GAME_DATA_EPOCH_KEY } from "../lib/game-data-epoch.ts";
+import { emojiTokens, normalizeEmojiSequence, puzzleListReturnUrl } from "../lib/admin-ui.ts";
 
 function memoryStorage(entries = {}) {
   const values = new Map(Object.entries(entries));
@@ -43,6 +44,15 @@ function memoryStorage(entries = {}) {
     removeItem(key) { values.delete(key); },
   };
 }
+
+test("normalizes emoji sequences without splitting compound emoji", () => {
+  assert.deepEqual(emojiTokens("  👨‍👩‍👧‍👦   🏳️‍🌈\t👍🏽 "), ["👨‍👩‍👧‍👦", "🏳️‍🌈", "👍🏽"]);
+  assert.equal(normalizeEmojiSequence("👨‍👩‍👧‍👦 🏳️‍🌈    👍🏽"), "👨‍👩‍👧‍👦  🏳️‍🌈  👍🏽");
+});
+
+test("returns to the saved puzzle anchor without losing list filters", () => {
+  assert.equal(puzzleListReturnUrl("/admin/?pool=daily#old", 42), "/admin/?pool=daily#puzzle-42");
+});
 
 test("persists only valid versioned player identities and builds credential headers", () => {
   const identity = { playerId: "123e4567-e89b-42d3-a456-426614174000", displayName: "Puzzle Dad", sessionId: "223e4567-e89b-42d3-a456-426614174000", token: "a".repeat(43) };
@@ -164,6 +174,7 @@ test("keeps puzzle answers and emoji visible in the narrow admin list", async ()
   assert.match(admin, /<option value="current">Today \+ upcoming<\/option>/);
   assert.match(admin, /<option value="all">Include previous<\/option>/);
   assert.match(admin, /history === "all" \|\| !puzzle\.readOnly/);
+  assert.match(admin, /id=\{`puzzle-\$\{puzzle\.number\}`\}/);
   assert.doesNotMatch(admin, /Active \(live \+ drafts\)|<option[^>]*>Draft/);
   assert.match(styles, /"number arrow"\s*"emoji emoji"\s*"main main"/);
   assert.match(styles, /\.puzzle-row-swipe \{[^}]*touch-action: pan-y;/);
@@ -310,6 +321,7 @@ test("keeps answers and credentials out of public payloads and includes the iden
   assert.match(admin, /New puzzle/);
   assert.match(feedbackAdmin, /Anonymous/);
   assert.match(editor, /Saved and live/);
+  assert.match(editor, /window\.location\.replace\(puzzleListReturnUrl\(returnTo, data\.number\)\)/);
   assert.match(editor, />Delete</);
   assert.match(editor, /disabled=\{puzzle\.readOnly\}/);
   assert.match(editor, /already run\. Its content and position are locked/);
@@ -317,6 +329,7 @@ test("keeps answers and credentials out of public payloads and includes the iden
   assert.match(emojiSearch, /Use suggested/);
   assert.match(emojiSearch, /Copy/);
   assert.match(emojiSearch, /Undo/);
+  assert.match(emojiSearch, /Drag clues to reorder/);
   assert.match(loader, /context === "challenge"/);
   assert.match(practicePage, /GameLoader mode="practice"/);
   assert.match(nextRoute, /GameLoader mode="next"/);

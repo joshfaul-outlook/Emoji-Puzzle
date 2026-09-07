@@ -1,7 +1,10 @@
 "use client";
 
+import { dismissAdminKeyboard } from "../../lib/admin-ui";
+
 export function AdminHeader({ title }: { title: string }) {
   async function logout() {
+    dismissAdminKeyboard();
     await fetch("/api/manage/session", { method: "DELETE" });
     window.location.replace("/admin/");
   }

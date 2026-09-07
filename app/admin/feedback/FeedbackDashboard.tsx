@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FeedbackItem } from "../../../lib/admin-types";
+import { dismissKeyboardForAdminAction } from "../../../lib/admin-ui";
 import { AdminHeader } from "../AdminHeader";
 import { AdminLogin } from "../AdminLogin";
 
@@ -25,7 +26,7 @@ export function FeedbackDashboard() {
   if (auth === "loading") return <main className="utility-page" aria-busy="true"><h1>Loading feedback…</h1></main>;
   if (auth === "signed-out") return <AdminLogin onSuccess={() => void load()} />;
   return (
-    <main className="admin-shell">
+    <main className="admin-shell" onClickCapture={(event) => dismissKeyboardForAdminAction(event.target)}>
       <AdminHeader title="Feedback" />
       <section className="admin-toolbar"><div><a className="back-link" href="/admin/">← Puzzles</a><p className="admin-eyebrow">Player signals</p><h1>What landed?</h1></div></section>
       <section className="feedback-summary" aria-label="Feedback summary"><div><strong>{visible.length}</strong><span>Responses</span></div><div><strong>{positive}%</strong><span>Positive</span></div><div><strong>{visible.filter((item) => item.comment).length}</strong><span>Written notes</span></div></section>
