@@ -17,6 +17,8 @@ export type AdminPuzzle = {
   createdAt: string;
   updatedAt: string;
   etag: string;
+  dailyDate?: string | null;
+  readOnly?: boolean;
 };
 
 export type FeedbackItem = {

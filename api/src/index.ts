@@ -5,10 +5,10 @@ import { body, json, requireAdmin, requireOrigin } from "./http.js";
 import { parseGameLaunchDate } from "./game-config.js";
 import { isAcceptedGuess, validatePuzzle, type PuzzlePool, type PuzzleStatus, type StoredPuzzle } from "./model.js";
 import { createPlayerToken, createVerificationCode, hashPlayerToken, hashVerificationCode, normalizePlayerName, normalizeRecoveryEmail, playerTokenMatches, recoveryEmailKey, verificationClientKey, verificationCodeMatches } from "./player-identity.js";
-import { applyPlayAction, consumeVerificationChallenge, createPlayerSession, createPlayerWithSession, createVerificationChallenge, getPlay, getPlayer, getPlayerByEmailKey, getPlayerByNormalizedName, getPlayerSession, getVerificationChallenge, insertFeedback, listFeedback, listPlayerSessions, listPuzzles, markFeedbackSubmitted, NameUnavailableError, playerNameAvailable, PlayConflictError, recordVerificationFailure, revokePlayerSession, startPlay, touchPlayer, touchPlayerSession, VerificationConflictError, VerificationRateLimitError, createPuzzle, getPuzzle, updatePuzzle, type PlayContext, type PlayerRecord, type PlayerSession, type VerificationPurpose, setPublicStats } from "./storage.js";
+import { applyPlayAction, consumeVerificationChallenge, createPlayerSession, createPlayerWithSession, createVerificationChallenge, deletePuzzle, getPlay, getPlayer, getPlayerByEmailKey, getPlayerByNormalizedName, getPlayerSession, getVerificationChallenge, insertFeedback, listFeedback, listPlayerSessions, listPuzzles, markFeedbackSubmitted, NameUnavailableError, playerNameAvailable, PlayConflictError, recordVerificationFailure, revokePlayerSession, startPlay, touchPlayer, touchPlayerSession, VerificationConflictError, VerificationRateLimitError, createPuzzle, getPuzzle, updatePuzzle, type PlayContext, type PlayerRecord, type PlayerSession, type VerificationPurpose, setPublicStats } from "./storage.js";
 import { suggestPuzzle } from "./suggestions.js";
 import { verificationSender } from "./verification-sender.js";
-import { currentDaily, getDailyAssignment, recordPublicExposure, voidDailyAssignment } from "./daily-schedule.js";
+import { adminScheduleState, currentDaily, ensureDailyAssignment, getDailyAssignment, listDailyAssignments, recordPublicExposure, utcDate, voidDailyAssignment } from "./daily-schedule.js";
 import { playerGlance, playerStats, rankingsPage, RankingsError } from "./rankings.js";
 
 const launchDate = parseGameLaunchDate();
@@ -319,11 +319,16 @@ async function session(request: HttpRequest) {
 
 async function adminPuzzles(request: HttpRequest) {
   const unauthorized = requireAdmin(request); if (unauthorized) return unauthorized;
-  if (request.method === "GET") return json({ puzzles: await listPuzzles() });
+  if (request.method === "GET") {
+    const now = new Date();
+    await ensureDailyAssignment(now);
+    const [puzzles, assignments] = await Promise.all([listPuzzles(), listDailyAssignments()]);
+    return json({ puzzles: puzzles.map((puzzle) => ({ ...puzzle, ...adminScheduleState(assignments, puzzle.id, utcDate(now)) })) });
+  }
   const denied = requireOrigin(request); if (denied) return denied;
   const payload = await body<Partial<StoredPuzzle>>(request);
   if (!payload) return json({ error: "Invalid puzzle" }, 400);
-  const status: PuzzleStatus = payload.status === "published" ? "published" : "draft";
+  const status: PuzzleStatus = "published";
   const acceptedAnswers = Array.from(new Set([payload.answer ?? "", ...(payload.acceptedAnswers ?? [])].map((value) => value.trim()).filter(Boolean)));
   const next = { ...payload, status, acceptedAnswers };
   const validation = validatePuzzle(next, status); if (validation) return json({ error: validation }, 400);
@@ -335,14 +340,17 @@ async function adminPuzzle(request: HttpRequest) {
   const id = request.params.id;
   const existing = id ? await getPuzzle(id) : null;
   if (!existing) return json({ error: "Puzzle not found" }, 404);
-  if (request.method === "GET") return json(existing);
+  const assignments = await listDailyAssignments();
+  const schedule = adminScheduleState(assignments, existing.id);
+  if (request.method === "GET") return json({ ...existing, ...schedule });
   const denied = requireOrigin(request); if (denied) return denied;
+  if (schedule.readOnly) return json({ error: "Previous Daily puzzles are read-only" }, 409);
   const etag = request.headers.get("if-match");
   if (!etag) return json({ error: "If-Match is required" }, 428);
   try {
-    if (request.method === "DELETE") return json(await updatePuzzle(existing, { status: "archived" }, etag));
+    if (request.method === "DELETE") { await deletePuzzle(existing, etag); return json({ deleted: true }); }
     const payload = await body<Partial<StoredPuzzle>>(request); if (!payload) return json({ error: "Invalid puzzle" }, 400);
-    const status: PuzzleStatus = payload.status === "published" || payload.status === "archived" ? payload.status : "draft";
+    const status: PuzzleStatus = payload.status === undefined ? existing.status : payload.status === "archived" ? "archived" : "published";
     const acceptedAnswers = Array.from(new Set([payload.answer ?? existing.answer, ...(payload.acceptedAnswers ?? existing.acceptedAnswers)].map((value) => value.trim()).filter(Boolean)));
     const next = { ...payload, status, acceptedAnswers };
     const validation = validatePuzzle({ ...existing, ...next }, status); if (validation) return json({ error: validation }, 400);

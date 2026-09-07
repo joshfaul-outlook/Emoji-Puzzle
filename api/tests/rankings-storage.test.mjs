@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import azureFunctions from "@azure/functions";
 const { HttpRequest, InvocationContext } = azureFunctions;
 import { TableClient } from "@azure/data-tables";
-import { createPlayerWithSession, createPuzzle, applyPlayAction, getPlayer, setPublicStats, listPlays, startPlay, playerTable, puzzleTable, updatePuzzle } from "../dist/src/storage.js";
+import { createPlayerWithSession, createPuzzle, applyPlayAction, deletePuzzle, getPuzzle, getPlayer, setPublicStats, listPlays, listPuzzles, startPlay, playerTable, puzzleTable, updatePuzzle } from "../dist/src/storage.js";
 import { hashPlayerToken } from "../dist/src/player-identity.js";
 import { ensureDailyAssignment, getDailyAssignment, getRankingsLaunchDate, voidDailyAssignment, recordPublicExposure } from "../dist/src/daily-schedule.js";
 import { playerGlance, playerStats, rankingsPage } from "../dist/src/rankings.js";
@@ -182,5 +182,16 @@ test("rankings storage, schedule and authenticated API integration", async (t) =
       const stale = await rankingsPage(undefined, new Date("2090-01-04T12:06:00Z"));
       assert.equal(stale.asOf, firstPage.asOf); assert.equal(stale.total, 26);
     } finally { TableClient.prototype.listEntities = original; }
+  });
+  await t.test("new puzzles are live immediately and deletion compacts their pool order", async () => {
+    const firstDisposable = await createPuzzle(({ ...authored("Disposable one"), pool: "practice", status: undefined }));
+    const secondDisposable = await createPuzzle(({ ...authored("Disposable two"), pool: "practice", status: undefined }));
+    assert.equal(firstDisposable.status, "published");
+    assert.equal(secondDisposable.position, firstDisposable.position + 1);
+    await deletePuzzle(firstDisposable, firstDisposable.etag);
+    assert.equal(await getPuzzle(firstDisposable.id), null);
+    const compacted = (await listPuzzles()).find((puzzle) => puzzle.id === secondDisposable.id);
+    assert.equal(compacted.position, firstDisposable.position);
+    await deletePuzzle(compacted, compacted.etag);
   });
 });

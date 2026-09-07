@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type TouchEvent } from "react";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { AdminPuzzle, PuzzleStatus } from "../../lib/admin-types";
+import type { AdminPuzzle } from "../../lib/admin-types";
 import { AdminHeader } from "./AdminHeader";
 import { AdminLogin } from "./AdminLogin";
 
@@ -13,9 +13,10 @@ export function AdminDashboard() {
   const [auth, setAuth] = useState<"loading" | "signed-in" | "signed-out">("loading");
   const [query, setQuery] = useState("");
   const [pool, setPool] = useState("all");
-  const [status, setStatus] = useState("active");
+  const [history, setHistory] = useState("current");
   const [error, setError] = useState("");
   const [moving, setMoving] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
   const load = useCallback(async () => {
@@ -36,14 +37,22 @@ export function AdminDashboard() {
     const text = `${puzzle.number} ${puzzle.answer} ${puzzle.emoji} ${puzzle.category}`.toLocaleLowerCase();
     return (!query || text.includes(query.toLocaleLowerCase())) &&
       (pool === "all" || puzzle.pool === pool) &&
-      (status === "all" || (status === "active" ? puzzle.status !== "archived" : puzzle.status === status));
-  }).sort((a, b) => a.pool.localeCompare(b.pool) || a.position - b.position || a.number - b.number), [pool, puzzles, query, status]);
-  const canReorder = !moving;
+      (puzzle.status === "published" || Boolean(puzzle.readOnly)) &&
+      (history === "all" || !puzzle.readOnly);
+  }).sort((a, b) => {
+    const poolOrder = a.pool.localeCompare(b.pool); if (poolOrder) return poolOrder;
+    if (a.pool === "daily" && b.pool === "daily") {
+      const scheduleOrder = Number(Boolean(b.dailyDate)) - Number(Boolean(a.dailyDate));
+      if (scheduleOrder) return scheduleOrder;
+    }
+    return a.position - b.position || a.number - b.number;
+  }), [history, pool, puzzles, query]);
+  const canReorder = !moving && !deleting;
 
   async function movePuzzle(id: string, targetId: string, dropAfter = false) {
     if (!canReorder || id === targetId || moving) return;
     const source = puzzles.find((item) => item.id === id); const target = puzzles.find((item) => item.id === targetId);
-    if (!source || !target || source.pool !== target.pool) return;
+    if (!source || !target || source.readOnly || target.readOnly || source.pool !== target.pool) return;
     const siblings = puzzles.filter((item) => item.pool === source.pool).sort((a, b) => a.position - b.position || a.number - b.number);
     const from = siblings.findIndex((item) => item.id === id); const to = siblings.findIndex((item) => item.id === targetId);
     const targetPosition = source.position < target.position ? target.position - 1 : target.position;
@@ -71,6 +80,17 @@ export function AdminDashboard() {
     void movePuzzle(String(active.id), String(over.id), dropAfter);
   }
 
+  async function deletePuzzle(puzzle: AdminPuzzle) {
+    if (deleting || puzzle.readOnly || !window.confirm(`Delete “${puzzle.answer}”? This cannot be undone.`)) return;
+    setDeleting(puzzle.id); setError("");
+    try {
+      const response = await fetch(`/api/manage/puzzles/${encodeURIComponent(puzzle.id)}`, { method: "DELETE", headers: { "if-match": puzzle.etag } });
+      if (!response.ok) throw new Error(response.status === 409 ? "Someone else changed this puzzle. Reload before deleting it." : "The puzzle could not be deleted.");
+      await load();
+    } catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : "The puzzle could not be deleted."); }
+    finally { setDeleting(null); }
+  }
+
   if (auth === "loading") return <main className="utility-page" aria-busy="true"><h1>Opening admin…</h1></main>;
   if (auth === "signed-out") return <AdminLogin onSuccess={() => void load()} />;
 
@@ -84,15 +104,15 @@ export function AdminDashboard() {
       <section className="admin-filters" aria-label="Puzzle filters">
         <label><span>Search</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Answer, emoji, category…" /></label>
         <label><span>Pool</span><select value={pool} onChange={(event) => setPool(event.target.value)}><option value="all">All pools</option><option value="daily">Daily</option><option value="practice">Practice</option></select></label>
-        <label><span>Visibility</span><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">Active (live + drafts)</option><option value="all">All puzzles</option>{(["draft", "published", "archived"] as PuzzleStatus[]).map((value) => <option key={value} value={value}>{value === "published" ? "Live" : value[0].toUpperCase() + value.slice(1)}</option>)}</select></label>
+        <label><span>Daily puzzles</span><select value={history} onChange={(event) => setHistory(event.target.value)}><option value="current">Today + upcoming</option><option value="all">Include previous</option></select></label>
       </section>
       {error && <p className="form-error" role="alert">{error}</p>}
-      <p className="reorder-help" role="status">Drag any handle to reorder within its pool; moves save automatically.</p>
+      <p className="reorder-help" role="status">Drag a handle to reorder live. On touch screens, swipe a card right to delete it.</p>
       <p className="results-count" aria-live="polite">Showing {visible.length} puzzles</p>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={visible.map((puzzle) => puzzle.id)} strategy={verticalListSortingStrategy}>
           <section className="puzzle-list" aria-label="Puzzle catalog">
-            {visible.map((puzzle) => <SortablePuzzleRow key={puzzle.id} puzzle={puzzle} disabled={!canReorder} returnTo={`${window.location.pathname}${window.location.search}`} />)}
+            {visible.map((puzzle) => <SortablePuzzleRow key={puzzle.id} puzzle={puzzle} disabled={!canReorder || Boolean(puzzle.readOnly)} deleting={deleting === puzzle.id} onDelete={deletePuzzle} returnTo={`${window.location.pathname}${window.location.search}`} />)}
           </section>
         </SortableContext>
       </DndContext>
@@ -100,14 +120,60 @@ export function AdminDashboard() {
   );
 }
 
-function SortablePuzzleRow({ puzzle, disabled, returnTo }: { puzzle: AdminPuzzle; disabled: boolean; returnTo: string }) {
+function SortablePuzzleRow({ puzzle, disabled, deleting, onDelete, returnTo }: { puzzle: AdminPuzzle; disabled: boolean; deleting: boolean; onDelete: (puzzle: AdminPuzzle) => Promise<void>; returnTo: string }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: puzzle.id, disabled });
-  return <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={`puzzle-row ${isDragging ? "is-moving" : ""}`}>
-    <button className="drag-handle" type="button" aria-label={`Drag ${puzzle.answer} to reorder`} disabled={disabled} {...attributes} {...listeners}>⠿</button>
-    <a className="puzzle-row-link" href={`/admin/puzzle/?id=${encodeURIComponent(puzzle.id)}&returnTo=${encodeURIComponent(returnTo)}`}>
-      <span className="puzzle-number"><strong>{puzzle.pool === "daily" ? "Daily" : "Practice"} {puzzle.position}</strong><small>Catalog #{puzzle.number}</small></span><span className="puzzle-row-emoji" aria-hidden="true">{puzzle.emoji}</span>
-      <span className="puzzle-row-main"><strong>{puzzle.answer}</strong><small>{puzzle.category} · {puzzle.pool}</small></span>
-      {puzzle.status !== "published" && <span className={`status-badge ${puzzle.status}`}>{puzzle.status}</span>}<span className="row-arrow" aria-hidden="true">›</span>
-    </a>
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const distance = useRef(0);
+  const suppressClick = useRef(false);
+  const [swipe, setSwipe] = useState(0);
+  const [swiping, setSwiping] = useState(false);
+
+  function touchStart(event: TouchEvent<HTMLDivElement>) {
+    if (puzzle.readOnly || event.touches.length !== 1 || (event.target as HTMLElement).closest(".drag-handle")) return;
+    start.current = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    distance.current = 0;
+    setSwiping(true);
+  }
+
+  function touchMove(event: TouchEvent<HTMLDivElement>) {
+    if (!start.current || event.touches.length !== 1) return;
+    const horizontal = event.touches[0].clientX - start.current.x;
+    const vertical = event.touches[0].clientY - start.current.y;
+    if (horizontal <= 0 || Math.abs(horizontal) <= Math.abs(vertical)) return;
+    distance.current = Math.min(horizontal, 112);
+    setSwipe(distance.current);
+  }
+
+  function touchEnd() {
+    if (!start.current) return;
+    suppressClick.current = distance.current > 8;
+    const shouldDelete = distance.current >= 72;
+    start.current = null; distance.current = 0;
+    setSwiping(false);
+    setSwipe(shouldDelete ? 112 : 0);
+    if (shouldDelete) void onDelete(puzzle).finally(() => setSwipe(0));
+  }
+
+  function touchCancel() {
+    start.current = null; distance.current = 0;
+    setSwiping(false); setSwipe(0);
+  }
+
+  function linkClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (!suppressClick.current) return;
+    event.preventDefault();
+    suppressClick.current = false;
+  }
+
+  return <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={`puzzle-row-swipe ${isDragging ? "is-moving" : ""} ${swiping ? "is-swiping" : ""} ${puzzle.readOnly ? "is-read-only" : ""}`} onTouchStart={touchStart} onTouchMove={touchMove} onTouchEnd={touchEnd} onTouchCancel={touchCancel}>
+    {!puzzle.readOnly && <span className="swipe-delete-action" aria-hidden="true">{deleting ? "Deleting…" : "Delete"}</span>}
+    <div className="puzzle-row" style={{ transform: `translateX(${swipe}px)` }}>
+      <button className="drag-handle" type="button" aria-label={`Drag ${puzzle.answer} to reorder`} disabled={disabled} {...attributes} {...listeners}>⠿</button>
+      <a className="puzzle-row-link" href={`/admin/puzzle/?id=${encodeURIComponent(puzzle.id)}&returnTo=${encodeURIComponent(returnTo)}`} onClick={linkClick}>
+        <span className="puzzle-number"><strong>{puzzle.pool === "daily" ? "Daily" : "Practice"} {puzzle.position}</strong><small>Catalog #{puzzle.number}</small>{puzzle.readOnly && <em className="history-badge">Previous · {puzzle.dailyDate}</em>}</span><span className="puzzle-row-emoji" aria-hidden="true">{puzzle.emoji}</span>
+        <span className="puzzle-row-main"><strong>{puzzle.answer}</strong><small>{puzzle.category} · {puzzle.pool}</small></span>
+        <span className="row-arrow" aria-hidden="true">›</span>
+      </a>
+    </div>
   </div>;
 }

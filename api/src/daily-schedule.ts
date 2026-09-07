@@ -31,6 +31,12 @@ export async function listDailyAssignments() {
   return rows.sort((a, b) => a.dailyDate.localeCompare(b.dailyDate));
 }
 
+export function adminScheduleState(assignments: DailyAssignment[], puzzleId: string, today = utcDate(new Date())) {
+  const assignment = assignments.find((item) => item.puzzleId === puzzleId);
+  const dailyDate = assignment?.dailyDate ?? null;
+  return { dailyDate, readOnly: dailyDate !== null && dailyDate < today };
+}
+
 // All reservations and date rows use one partition, so issuing a date and
 // consuming its puzzle is one atomic transaction across concurrent hosts.
 async function migrateFailedInitialActivation(initialized: InitializationEntity) {

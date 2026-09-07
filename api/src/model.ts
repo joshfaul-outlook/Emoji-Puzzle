@@ -37,10 +37,10 @@ export function validatePuzzle(input: Partial<StoredPuzzle>, status: PuzzleStatu
   if (!input.answer?.trim()) return "An answer is required.";
   if (input.pool !== "daily" && input.pool !== "practice") return "Choose a puzzle pool.";
   if (status !== "published") return null;
-  if (!input.emoji?.trim()) return "Published puzzles need an emoji sequence.";
-  if (!input.category?.trim()) return "Published puzzles need a category.";
-  if (!input.explanation?.trim()) return "Published puzzles need an explanation.";
+  if (!input.emoji?.trim()) return "Puzzles need an emoji sequence.";
+  if (!input.category?.trim()) return "Puzzles need a category.";
+  if (!input.explanation?.trim()) return "Puzzles need an explanation.";
   if (!input.acceptedAnswers?.some((answer) => normalizeGuess(answer) === normalizeGuess(input.answer ?? ""))) return "Accepted answers must include the canonical answer.";
-  if (input.hints?.length !== 3 || input.hints.some((hint) => !hint.trim())) return "Published puzzles need three complete hints.";
+  if (input.hints?.length !== 3 || input.hints.some((hint) => !hint.trim())) return "Puzzles need three complete hints.";
   return null;
 }

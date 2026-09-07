@@ -55,9 +55,9 @@ test("marks only the current ordinary Daily context ranking eligible", () => {
   for (const context of ["practice", "challenge", "author-test"]) assert.equal(isRankingEligiblePlay(context, "practice", true), false);
 });
 
-test("allows answer-only drafts and validates all publish fields", () => {
+test("keeps legacy draft validation while live saves require complete puzzle fields", () => {
   assert.equal(validatePuzzle({ answer: "Draft", pool: "practice" }, "draft"), null);
-  assert.equal(validatePuzzle({ ...puzzle, emoji: "" }, "published"), "Published puzzles need an emoji sequence.");
+  assert.equal(validatePuzzle({ ...puzzle, emoji: "" }, "published"), "Puzzles need an emoji sequence.");
   assert.equal(validatePuzzle(puzzle, "published"), null);
 });
 

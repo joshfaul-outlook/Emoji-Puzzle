@@ -106,7 +106,7 @@ export async function createPuzzle(input: Partial<StoredPuzzle>) {
   const number = await reserveNumber();
   const idBase = (input.answer ?? "puzzle").normalize("NFKD").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50) || "puzzle";
   const { entity, order } = await orderSnapshot(siblings, true);
-  const puzzle: Omit<StoredPuzzle, "etag"> = { id: `${idBase}-${randomUUID().slice(0, 8)}`, number, pool, position: 0, status: input.status ?? "draft", emoji: input.emoji?.trim() ?? "", answer: input.answer?.trim() ?? "", acceptedAnswers: input.acceptedAnswers ?? [], category: input.category?.trim() ?? "", structure: input.structure ?? "literal", hints: (input.hints ?? ["", "", ""]).slice(0, 3), explanation: input.explanation?.trim() ?? "", createdAt: now, updatedAt: now };
+  const puzzle: Omit<StoredPuzzle, "etag"> = { id: `${idBase}-${randomUUID().slice(0, 8)}`, number, pool, position: 0, status: input.status ?? "published", emoji: input.emoji?.trim() ?? "", answer: input.answer?.trim() ?? "", acceptedAnswers: input.acceptedAnswers ?? [], category: input.category?.trim() ?? "", structure: input.structure ?? "literal", hints: (input.hints ?? ["", "", ""]).slice(0, 3), explanation: input.explanation?.trim() ?? "", createdAt: now, updatedAt: now };
   const nextOrder = moveInCatalog(order, puzzle.id, pool, input.position);
   puzzle.position = positionsForOrder(nextOrder).get(puzzle.id) ?? 1;
   if (entity) { const transaction = new TableTransaction(); transaction.createEntity(toPuzzleEntity(puzzle)); transaction.updateEntity(orderEntity(nextOrder, now), "Replace", { etag: entity.etag }); await puzzleTable().submitTransaction(transaction.actions); }
@@ -124,6 +124,10 @@ export async function updatePuzzle(existing: StoredPuzzle, input: Partial<Stored
   if (snapshot.entity && JSON.stringify(nextOrder) !== JSON.stringify(snapshot.order)) { const transaction = new TableTransaction(); transaction.updateEntity(toPuzzleEntity(next), "Replace", { etag }); transaction.updateEntity(orderEntity(nextOrder, now), "Replace", { etag: snapshot.entity.etag }); await puzzleTable().submitTransaction(transaction.actions); }
   else await puzzleTable().updateEntity(toPuzzleEntity(next), "Replace", { etag });
   return getPuzzle(existing.id);
+}
+
+export async function deletePuzzle(existing: StoredPuzzle, etag: string) {
+  await puzzleTable().deleteEntity("Puzzle", existing.id, { etag });
 }
 
 export type PlayerRecord = {

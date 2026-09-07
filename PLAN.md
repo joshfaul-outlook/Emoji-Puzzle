@@ -4,7 +4,7 @@
 
 Emoji Daily ships as a mobile-first static web app with a same-origin Azure API. It has one shared UTC Daily puzzle, a separate 330-puzzle Practice sequence, deterministic answer matching, three authored hints, explicit reveal, spoiler-free sharing, server-resumable Daily play, and a passwordless recoverable named identity with independent device sessions.
 
-Azure Table Storage is the production source of truth for puzzles, player-name reservations, durable play facts, and feedback. The private `/admin/` portal supports searching, drafting, editing, publishing, archiving, restoring, drag-and-drop pool ordering, emoji keyword search, AI phrase suggestions, and attributed feedback review. The original 350 records remain an idempotent migration fixture.
+Azure Table Storage is the production source of truth for puzzles, player-name reservations, durable play facts, and feedback. The private `/admin/` portal supports searching, live saves, permanent deletion, drag-and-drop pool ordering, swipe-to-delete on touch screens, read-only access to previous Daily puzzles, emoji keyword search, AI phrase suggestions, and attributed feedback review. The original 350 records remain an idempotent migration fixture.
 
 ## Product learning
 
@@ -18,7 +18,7 @@ Azure Table Storage is the production source of truth for puzzles, player-name r
 - All frontend/API tests, lint, TypeScript builds, and static export pass.
 - Static output contains no accepted answers, unrevealed hints, credentials, or storage configuration.
 - Production tables are seeded and Daily/Practice positions reconcile with the fixture.
-- Gameplay, feedback, login, CRUD, archive/restore, ETag conflict, and emoji-helper flows work on touch and keyboard.
+- Gameplay, feedback, login, CRUD, live reordering, confirmed deletion, ETag conflict, and emoji-helper flows work on touch and keyboard.
 - Layouts work without horizontal overflow from 320px through desktop, in portrait and landscape.
 - The generated Azure hostname passes HTTPS smoke tests before any custom-domain change.
 

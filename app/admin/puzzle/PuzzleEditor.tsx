@@ -1,12 +1,12 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import type { AdminPuzzle, PuzzleStatus } from "../../../lib/admin-types";
+import type { AdminPuzzle } from "../../../lib/admin-types";
 import { AdminHeader } from "../AdminHeader";
 import { AdminLogin } from "../AdminLogin";
 import { EmojiSearch } from "./EmojiSearch";
 
-const blank: AdminPuzzle = { id: "", number: 0, pool: "practice", position: 0, status: "draft", emoji: "", answer: "", acceptedAnswers: [], category: "", hints: ["", "", ""], explanation: "", createdAt: "", updatedAt: "", etag: "" };
+const blank: AdminPuzzle = { id: "", number: 0, pool: "practice", position: 0, status: "published", emoji: "", answer: "", acceptedAnswers: [], category: "", hints: ["", "", ""], explanation: "", createdAt: "", updatedAt: "", etag: "" };
 
 export function PuzzleEditor() {
   const [puzzle, setPuzzle] = useState<AdminPuzzle>(blank);
@@ -33,7 +33,7 @@ export function PuzzleEditor() {
     const loaded = await response.json() as AdminPuzzle;
     setPuzzle(loaded);
     setLoadedPosition(loaded.position);
-    setDirty(false);
+    setDirty(loaded.status !== "published");
     setAuth("signed-in");
   }, [id]);
 
@@ -52,11 +52,11 @@ export function PuzzleEditor() {
     setNotice("");
   }
 
-  async function save(event?: FormEvent, requestedStatus?: PuzzleStatus) {
+  async function save(event?: FormEvent) {
     event?.preventDefault();
-    const next = { ...puzzle, status: requestedStatus ?? puzzle.status, acceptedAnswers: Array.from(new Set([puzzle.answer, ...puzzle.acceptedAnswers].map((value) => value.trim()).filter(Boolean))) };
-    if (requestedStatus === "published" && !window.confirm("Publish this puzzle to the live catalog?")) return;
-    if (!requestedStatus && id && puzzle.status === "published" && !window.confirm("Save these changes to the live puzzle?")) return;
+    if (puzzle.readOnly) return;
+    const next = { ...puzzle, status: "published" as const, acceptedAnswers: Array.from(new Set([puzzle.answer, ...puzzle.acceptedAnswers].map((value) => value.trim()).filter(Boolean))) };
+    if (id && !window.confirm("Save these changes to the live puzzle?")) return;
     if (id && puzzle.pool === "daily" && loadedPosition > 0 && next.position !== loadedPosition && !window.confirm("Change this puzzle’s position in the Daily rotation?")) return;
     setBusy(true); setError(""); setNotice("");
     const response = await fetch(id ? `/api/manage/puzzles/${encodeURIComponent(id)}` : "/api/manage/puzzles", {
@@ -67,7 +67,7 @@ export function PuzzleEditor() {
     setBusy(false);
     const data = await response.json().catch(() => ({})) as AdminPuzzle & { error?: string };
     if (!response.ok) { setError(response.status === 409 ? "Someone else changed this puzzle. Reload before saving again." : data.error ?? "The puzzle could not be saved."); return; }
-    setPuzzle(data); setLoadedPosition(data.position); setDirty(false); setNotice("Saved");
+    setPuzzle(data); setLoadedPosition(data.position); setDirty(false); setNotice("Saved and live");
     if (!id) { window.history.replaceState(null, "", `/admin/puzzle/?id=${encodeURIComponent(data.id)}`); setId(data.id); }
   }
 
@@ -88,13 +88,13 @@ export function PuzzleEditor() {
     update(field, aiSuggestion[field] as AdminPuzzle[typeof field]);
   }
 
-  async function archive() {
-    if (!id || !window.confirm("Archive this puzzle? It will leave the playable catalog.")) return;
+  async function deletePuzzle() {
+    if (!id || puzzle.readOnly || !window.confirm(`Delete “${puzzle.answer}”? This cannot be undone.`)) return;
     setBusy(true);
     const response = await fetch(`/api/manage/puzzles/${encodeURIComponent(id)}`, { method: "DELETE", headers: { "if-match": puzzle.etag } });
     setBusy(false);
-    if (!response.ok) { setError("The puzzle could not be archived."); return; }
-    setPuzzle(await response.json() as AdminPuzzle); setDirty(false); setNotice("Archived");
+    if (!response.ok) { setError(response.status === 409 ? "Someone else changed this puzzle. Reload before deleting it." : "The puzzle could not be deleted."); return; }
+    window.location.replace(returnTo);
   }
 
   if (auth === "loading") return <main className="utility-page" aria-busy="true"><h1>Opening editor…</h1></main>;
@@ -104,7 +104,9 @@ export function PuzzleEditor() {
     <main className="admin-shell editor-shell">
       <AdminHeader title={id ? `Puzzle #${puzzle.number}` : "New puzzle"} />
       <form className="puzzle-editor" onSubmit={(event) => void save(event)}>
-        <div className="editor-title"><div><a className="back-link" href={returnTo}>← All puzzles</a><p className="admin-eyebrow">{id ? `${puzzle.pool} · ${puzzle.status}` : "New draft"}</p><h1>{puzzle.answer || "Untitled puzzle"}</h1></div><div className="live-preview"><span>{puzzle.emoji || "✨  ❓"}</span><small>Player preview</small></div></div>
+        <div className="editor-title"><div><a className="back-link" href={returnTo}>← All puzzles</a><p className="admin-eyebrow">{puzzle.readOnly ? `Daily ${puzzle.dailyDate} · read only` : id ? `${puzzle.pool} · live` : "New puzzle"}</p><h1>{puzzle.answer || "Untitled puzzle"}</h1></div><div className="live-preview"><span>{puzzle.emoji || "✨  ❓"}</span><small>Player preview</small></div></div>
+        {puzzle.readOnly && <p className="readonly-notice">This Daily puzzle has already run. Its content and position are locked.</p>}
+        <fieldset className="editor-fields" disabled={puzzle.readOnly}>
         <section className="editor-card">
           <h2>Puzzle</h2>
           <div className="field-grid two"><label><span>Answer</span><input value={puzzle.answer} onChange={(e) => update("answer", e.target.value)} required /><button className="secondary-button" type="button" onClick={() => void getAiHelp()} disabled={aiBusy || !puzzle.answer.trim()}>{aiBusy ? "Thinking…" : "AI help"}</button></label><label><span>Emoji sequence</span><div className="input-action"><input value={puzzle.emoji} onChange={(e) => update("emoji", e.target.value)} /><button type="button" onClick={() => setShowEmoji(true)}>Find emoji</button></div></label></div>
@@ -115,13 +117,12 @@ export function PuzzleEditor() {
         {aiSuggestion && <section className="editor-card ai-suggestion" aria-live="polite"><h2>AI suggestions</h2><p>Review these ideas before applying them. They are not saved automatically.</p><div className="ai-suggestion-grid">{(["emoji", "category", "acceptedAnswers", "hints", "explanation"] as const).map((field) => <div key={field}><strong>{field === "acceptedAnswers" ? "Accepted answers" : field[0].toUpperCase() + field.slice(1)}</strong><pre>{Array.isArray(aiSuggestion[field]) ? aiSuggestion[field].join("\n") : aiSuggestion[field]}</pre><button className="secondary-button" type="button" onClick={() => applyAi(field)}>Apply</button></div>)}</div><button className="primary-button admin-primary" type="button" onClick={() => { (Object.keys(aiSuggestion) as Array<keyof typeof aiSuggestion>).forEach((field) => applyAi(field)); }}>Apply all suggestions</button></section>}
         <section className="editor-card"><h2>Progressive hints</h2>{[0,1,2].map((index) => <label key={index}><span>Hint {index + 1}</span><input value={puzzle.hints[index] ?? ""} onChange={(e) => { const hints = [...puzzle.hints]; hints[index] = e.target.value; update("hints", hints); }} /></label>)}</section>
         <section className="editor-card"><h2>The reveal</h2><label><span>Explanation</span><textarea rows={5} value={puzzle.explanation} onChange={(e) => update("explanation", e.target.value)} /></label></section>
+        </fieldset>
         {showEmoji && <div className="admin-overlay" role="dialog" aria-modal="true" aria-label="Emoji search"><div className="emoji-sheet"><button className="sheet-close" type="button" onClick={() => setShowEmoji(false)} aria-label="Close emoji search">×</button><EmojiSearch phrase={puzzle.answer} value={puzzle.emoji} onChange={(value) => update("emoji", value)} /></div></div>}
         <div className="editor-actions">
-          <a className="secondary-button" href={returnTo}>Cancel</a>
-          {id && puzzle.status !== "archived" && <button className="danger-button" type="button" disabled={busy} onClick={() => void archive()}>Archive</button>}
-          {puzzle.status === "archived" && <button className="secondary-button" type="button" disabled={busy} onClick={() => void save(undefined, "draft")}>Restore draft</button>}
-          <button className="secondary-button" type="submit" disabled={busy || !dirty}>{busy ? "Saving…" : puzzle.status === "published" ? "Save changes" : "Save draft"}</button>
-          <button className="primary-button admin-primary" type="button" disabled={busy} onClick={() => void save(undefined, "published")}>Publish</button>
+          <a className="secondary-button" href={returnTo}>{puzzle.readOnly ? "Back" : "Cancel"}</a>
+          {!puzzle.readOnly && id && <button className="danger-button" type="button" disabled={busy} onClick={() => void deletePuzzle()}>Delete</button>}
+          {!puzzle.readOnly && <button className="primary-button admin-primary" type="submit" disabled={busy || !dirty}>{busy ? "Saving…" : "Save"}</button>}
           <span className="save-notice" aria-live="polite">{notice}</span>
         </div>
         {error && <p className="form-error sticky-error" role="alert">{error}</p>}

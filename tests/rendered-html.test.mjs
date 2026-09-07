@@ -158,9 +158,15 @@ test("keeps puzzle answers and emoji visible in the narrow admin list", async ()
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
 
-  assert.match(admin, /puzzle\.status !== "published"/);
-  assert.match(admin, /Active \(live \+ drafts\)/);
-  assert.match(styles, /"number arrow"\s*"emoji emoji"\s*"main status"/);
+  assert.match(admin, /distance\.current >= 72/);
+  assert.match(admin, /swipe a card right to delete it/i);
+  assert.match(admin, /This cannot be undone/);
+  assert.match(admin, /<option value="current">Today \+ upcoming<\/option>/);
+  assert.match(admin, /<option value="all">Include previous<\/option>/);
+  assert.match(admin, /history === "all" \|\| !puzzle\.readOnly/);
+  assert.doesNotMatch(admin, /Active \(live \+ drafts\)|<option[^>]*>Draft/);
+  assert.match(styles, /"number arrow"\s*"emoji emoji"\s*"main main"/);
+  assert.match(styles, /\.puzzle-row-swipe \{[^}]*touch-action: pan-y;/);
   assert.match(styles, /\.puzzle-row-emoji \{[^}]*overflow: visible;[^}]*white-space: normal;/);
   assert.match(styles, /\.puzzle-row-main strong, \.puzzle-row-main small \{[^}]*overflow: visible;[^}]*white-space: normal;[^}]*overflow-wrap: anywhere;/);
 });
@@ -291,6 +297,9 @@ test("keeps answers and credentials out of public payloads and includes the iden
   assert.match(api, /plays\/start/);
   assert.match(api, /authenticatedPlayer/);
   assert.match(api, /pool === "practice" && comment !== null/);
+  assert.match(api, /payload\.status === undefined \? existing\.status/);
+  assert.match(api, /deletePuzzle\(existing, etag\)/);
+  assert.match(api, /Previous Daily puzzles are read-only/);
   assert.match(storage, /PuzzleCatalog/);
   assert.match(storage, /PuzzleFeedback/);
   assert.match(storage, /PlayerDirectory/);
@@ -300,8 +309,11 @@ test("keeps answers and credentials out of public payloads and includes the iden
   assert.match(storage, /etag/);
   assert.match(admin, /New puzzle/);
   assert.match(feedbackAdmin, /Anonymous/);
-  assert.match(editor, /Publish/);
-  assert.match(editor, /Archive/);
+  assert.match(editor, /Saved and live/);
+  assert.match(editor, />Delete</);
+  assert.match(editor, /disabled=\{puzzle\.readOnly\}/);
+  assert.match(editor, /already run\. Its content and position are locked/);
+  assert.doesNotMatch(editor, /Save draft|>Publish<|>Archive<|Restore draft/);
   assert.match(emojiSearch, /Use suggested/);
   assert.match(emojiSearch, /Copy/);
   assert.match(emojiSearch, /Undo/);

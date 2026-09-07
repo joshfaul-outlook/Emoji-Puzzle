@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { adminScheduleState } from "../dist/src/daily-schedule.js";
 import { buildRankings, dailyStreaks, eligibleDailyPlays, summarizePlays } from "../dist/src/ranking-math.js";
 
 const launch = "2026-08-01";
@@ -7,6 +8,13 @@ const date = (i) => new Date(Date.parse(`${launch}T00:00:00Z`) + i * 86400000).t
 const assignment = (i, extra = {}) => ({ dailyDate: date(i), puzzleId: `p${i}`, revision: `r${i}`, void: false, ...extra });
 const play = (i, extra = {}) => ({ playerId: "a", playId: `play${i}`, puzzleId: `p${i}`, pool: "daily", context: "daily", rankingEligible: true, startedAt: `${date(i)}T01:00:00Z`, completedAt: `${date(i)}T02:00:00Z`, outcome: "solved", guessCount: 2, hintCount: 0, dailyDate: date(i), puzzleRevision: `r${i}`, rankingOutcome: "solved", ...extra });
 const now = (i, time = "12:00:00") => new Date(`${date(i)}T${time}Z`);
+
+test("marks only earlier issued Daily puzzles read-only in admin", () => {
+  const assignments = [assignment(0), assignment(1), assignment(2, { puzzleId: null, puzzle: null, void: true })];
+  assert.deepEqual(adminScheduleState(assignments, "p0", date(1)), { dailyDate: date(0), readOnly: true });
+  assert.deepEqual(adminScheduleState(assignments, "p1", date(1)), { dailyDate: date(1), readOnly: false });
+  assert.deepEqual(adminScheduleState(assignments, "unassigned", date(1)), { dailyDate: null, readOnly: false });
+});
 
 test("summaries use completed solve rates, solved averages and distinct attempts", () => {
   const first = play(0); const revealed = play(1, { outcome: "revealed", guessCount: 20, hintCount: 3 });
