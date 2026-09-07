@@ -152,6 +152,19 @@ test("keeps shortened and cultural spellings explicitly authored", () => {
   assert.equal(isAcceptedGuess(spellingVariantPuzzle, "collour theory"), false);
 });
 
+test("keeps puzzle answers and emoji visible in the narrow admin list", async () => {
+  const [admin, styles] = await Promise.all([
+    readFile(new URL("../app/admin/AdminDashboard.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(admin, /puzzle\.status !== "published"/);
+  assert.match(admin, /Active \(live \+ drafts\)/);
+  assert.match(styles, /"number arrow"\s*"emoji emoji"\s*"main status"/);
+  assert.match(styles, /\.puzzle-row-emoji \{[^}]*overflow: visible;[^}]*white-space: normal;/);
+  assert.match(styles, /\.puzzle-row-main strong, \.puzzle-row-main small \{[^}]*overflow: visible;[^}]*white-space: normal;[^}]*overflow-wrap: anywhere;/);
+});
+
 test("uses one shared UTC puzzle for the whole calendar day", () => {
   const secondDay = new Date(Date.parse(`${GAME_CONFIG.launchDate}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
   const morning = getDailyPuzzle(new Date(`${secondDay}T00:00:01Z`));

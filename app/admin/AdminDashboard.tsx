@@ -84,7 +84,7 @@ export function AdminDashboard() {
       <section className="admin-filters" aria-label="Puzzle filters">
         <label><span>Search</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Answer, emoji, category…" /></label>
         <label><span>Pool</span><select value={pool} onChange={(event) => setPool(event.target.value)}><option value="all">All pools</option><option value="daily">Daily</option><option value="practice">Practice</option></select></label>
-        <label><span>Status</span><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">Active</option><option value="all">All</option>{(["draft", "published", "archived"] as PuzzleStatus[]).map((value) => <option key={value}>{value}</option>)}</select></label>
+        <label><span>Visibility</span><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">Active (live + drafts)</option><option value="all">All puzzles</option>{(["draft", "published", "archived"] as PuzzleStatus[]).map((value) => <option key={value} value={value}>{value === "published" ? "Live" : value[0].toUpperCase() + value.slice(1)}</option>)}</select></label>
       </section>
       {error && <p className="form-error" role="alert">{error}</p>}
       <p className="reorder-help" role="status">Drag any handle to reorder within its pool; moves save automatically.</p>
@@ -107,7 +107,7 @@ function SortablePuzzleRow({ puzzle, disabled, returnTo }: { puzzle: AdminPuzzle
     <a className="puzzle-row-link" href={`/admin/puzzle/?id=${encodeURIComponent(puzzle.id)}&returnTo=${encodeURIComponent(returnTo)}`}>
       <span className="puzzle-number"><strong>{puzzle.pool === "daily" ? "Daily" : "Practice"} {puzzle.position}</strong><small>Catalog #{puzzle.number}</small></span><span className="puzzle-row-emoji" aria-hidden="true">{puzzle.emoji}</span>
       <span className="puzzle-row-main"><strong>{puzzle.answer}</strong><small>{puzzle.category} · {puzzle.pool}</small></span>
-      <span className={`status-badge ${puzzle.status}`}>{puzzle.status}</span><span className="row-arrow" aria-hidden="true">›</span>
+      {puzzle.status !== "published" && <span className={`status-badge ${puzzle.status}`}>{puzzle.status}</span>}<span className="row-arrow" aria-hidden="true">›</span>
     </a>
   </div>;
 }
