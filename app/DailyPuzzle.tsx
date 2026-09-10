@@ -77,6 +77,7 @@ export function DailyPuzzle({
   const [nextPuzzleCountdown, setNextPuzzleCountdown] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [statsView, setStatsView] = useState<"daily" | "rankings" | "practice">(puzzle.context === "practice" ? "practice" : "daily");
   const [statsRefresh, setStatsRefresh] = useState(0);
   const [shareState, setShareState] = useState<"idle" | "shared" | "copied" | "error">("idle");
   const [nativeSharingAvailable, setNativeSharingAvailable] = useState(false);
@@ -527,11 +528,11 @@ export function DailyPuzzle({
             </svg>
             <span>Share</span>
           </button>
-          <button className="player-chip player-stats-button" type="button" onClick={() => setStatsOpen(true)} aria-label={`Stats & rankings for ${identity.displayName}`} title="Stats & rankings"><span className="player-chip-name">{identity.displayName}</span><span>Stats</span></button>
+          <button className="player-chip player-stats-button" type="button" onClick={() => { setStatsView(puzzle.context === "practice" ? "practice" : "daily"); setStatsOpen(true); }} aria-label={`Stats & rankings for ${identity.displayName}`} title="Stats & rankings"><span className="player-chip-name">{identity.displayName}</span><span>Stats</span></button>
         </div>
       </header>
 
-      {statsOpen && <PlayerStatsPanel identity={identity} initialView={puzzle.context === "practice" ? "practice" : "daily"} onClose={() => { setStatsOpen(false); setStatsRefresh((value) => value + 1); }} />}
+      {statsOpen && <PlayerStatsPanel identity={identity} initialView={statsView} onClose={() => { setStatsOpen(false); setStatsRefresh((value) => value + 1); }} />}
 
       <nav className="mode-switch" aria-label="Game mode">
         <button
@@ -553,7 +554,7 @@ export function DailyPuzzle({
       </nav>
 
       {(puzzle.context === "daily" || puzzle.context === "practice") && (
-        <ProgressStrip identity={identity} mode={puzzle.context} outcome={play.outcome} refreshKey={`${play.outcome}:${statsRefresh}`} onOpen={() => setStatsOpen(true)} />
+        <ProgressStrip identity={identity} mode={puzzle.context} outcome={play.outcome} refreshKey={`${play.outcome}:${statsRefresh}`} onOpen={() => { setStatsView(puzzle.context === "daily" ? "rankings" : "practice"); setStatsOpen(true); }} />
       )}
 
       {!isFinished ? (

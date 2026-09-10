@@ -36,11 +36,11 @@
 .rankings-table th:nth-child(2) { width: 34%; text-align: left; }
 .rankings-table th:first-child { width: 12%; }
 .rankings-table thead th { white-space: nowrap; overflow-wrap: normal; font-size: 10px; padding-inline: 1px; }
-.player-stats-button { display: flex; align-items: center; gap: 5px; }
+.player-stats-button { display: flex; align-items: center; gap: 5px; cursor: pointer; }
 .player-chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .stats-dialog .secondary-button { min-height: 44px; margin-top: 12px; }
 .daily-streak { color: var(--slate-dark); font-weight: 700; }
-.progress-strip { width: min(100%, 440px); min-height: 46px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr auto; align-items: center; gap: 8px; border: 0; border-radius: 13px; padding: 7px 9px 7px 13px; background: color-mix(in srgb, var(--mist-soft) 78%, var(--surface)); text-align: left; }
+.progress-strip { width: min(100%, 440px); min-height: 46px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 8px; border: 0; border-radius: 13px; padding: 7px 13px; background: color-mix(in srgb, var(--mist-soft) 78%, var(--surface)); cursor: pointer; text-align: left; }
 .progress-strip.metric-sentence { grid-template-columns: 1fr auto; }
 .progress-item { min-width: 0; display: flex; align-items: center; gap: 7px; }
 .progress-icon { font-size: 17px; }
