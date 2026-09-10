@@ -293,7 +293,7 @@ test("keeps answers and credentials out of public payloads and includes the iden
   assert.doesNotMatch(client, /dailyPlayStorageKey/);
   assert.match(statsUi, /StatsView = "daily" \| "rankings" \| "practice"/);
   assert.match(statsUi, /players\/me\/glance/);
-  assert.doesNotMatch(statsUi, /Open Daily rankings:[^;]*progress-arrow/);
+  assert.doesNotMatch(statsUi, /progress-arrow/);
   assert.match(client, /puzzle\.context === "daily" \? "rankings" : "practice"/);
   assert.doesNotMatch(statsUi, /stats\.challenges|Practice challenges/);
   assert.match(loader, /PlayerIdentityGate/);

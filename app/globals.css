@@ -41,14 +41,13 @@
 .stats-dialog .secondary-button { min-height: 44px; margin-top: 12px; }
 .daily-streak { color: var(--slate-dark); font-weight: 700; }
 .progress-strip { width: min(100%, 440px); min-height: 46px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 8px; border: 0; border-radius: 13px; padding: 7px 13px; background: color-mix(in srgb, var(--mist-soft) 78%, var(--surface)); cursor: pointer; text-align: left; }
-.progress-strip.metric-sentence { grid-template-columns: 1fr auto; }
+.progress-strip.metric-sentence { grid-template-columns: 1fr; }
 .progress-item { min-width: 0; display: flex; align-items: center; gap: 7px; }
 .progress-icon { font-size: 17px; }
 .progress-item > span:last-child { min-width: 0; display: grid; gap: 1px; }
 .progress-item strong, .progress-item small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .progress-item strong { font-size: 13px; }
 .progress-item small { color: var(--muted); font-size: 11px; }
-.progress-arrow { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--surface) 84%, transparent); color: var(--slate-dark); font-size: 18px; }
 .stats-dialog :focus-visible { outline: 3px solid var(--brand-slate); outline-offset: 3px; }
 
 :root {
