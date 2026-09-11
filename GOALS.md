@@ -31,7 +31,7 @@ The MVP exists to test that hypothesis, not to prove a complete business model.
 
 - One new puzzle each day.
 - The same puzzle for everyone.
-- No password, conventional sign-up, feed, or busywork; a verified email lets a player keep one display name and continue on another device.
+- No password, conventional sign-up, feed, or busywork; a verified email lets a player keep one display name and continue on another device. A player may instead play anonymously with no name or email; anonymous play stays on that browser, is never ranked, and cannot be recovered after local data is lost.
 - Unlimited guesses and optional help.
 - A satisfying explanation whether solved or revealed.
 - An optional Practice mode for playing several separate, ranking-ineligible puzzles at a time.
@@ -44,7 +44,7 @@ The MVP exists to test that hypothesis, not to prove a complete business model.
 
 ## Player statistics and Daily rankings
 
-Players can view separate Daily stats, public rankings, and private Practice stats through their player-name Stats control. Daily stats include current and best solve streaks. Shared Practice challenges keep their result-card comparison and do not appear in Stats. Public rankings use the last 30 UTC dates: most eligible Daily solves, then most solves without hints, with shared ranks. Public Daily stats default to yes; a player can opt out across all their devices. Practice is always private. Repeated Daily puzzles never count, and the launch schedule never wraps.
+Named players can view separate Daily stats, public rankings, and private Practice stats through their player-name Stats control. Anonymous players can view the public rankings but have no personal stats, streaks, or ranking entry. Daily stats include current and best solve streaks. Shared Practice challenges keep their result-card comparison and do not appear in Stats. Public rankings use the last 30 UTC dates: most eligible Daily solves, then most solves without hints, with shared ranks. Public Daily stats default to yes; a player can opt out across all their devices. Practice is always private. Repeated Daily puzzles never count, and the launch schedule never wraps.
 
 ## What success looks like in this phase
 

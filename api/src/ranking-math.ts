@@ -1,6 +1,7 @@
 export type RankingPlay = {
   playerId: string; playId: string; puzzleId: string; pool: "daily" | "practice";
   context: "daily" | "practice" | "challenge" | "author-test"; rankingEligible: boolean;
+  identityKind?: "player" | "anonymous";
   startedAt: string; completedAt: string | null; outcome: "playing" | "solved" | "revealed";
   guessCount: number; hintCount: number; dailyDate?: string; puzzleRevision?: string; rankingOutcome?: string;
 };
@@ -45,7 +46,7 @@ export function eligibleDailyPlays(plays: RankingPlay[], assignments: RankingAss
   const exposed = new Set(plays.filter((p) => p.context === "author-test").map((p) => `${p.playerId}:${p.puzzleId}`));
   return canonicalPlays(plays).filter((p) => {
     const a = p.dailyDate ? dates.get(p.dailyDate) : null;
-    return a && !a.void && a.dailyDate >= launchDate && a.puzzleId === p.puzzleId && a.revision === p.puzzleRevision &&
+    return p.identityKind !== "anonymous" && a && !a.void && a.dailyDate >= launchDate && a.puzzleId === p.puzzleId && a.revision === p.puzzleRevision &&
       p.rankingEligible && p.rankingOutcome === "solved" && p.outcome === "solved" &&
       p.startedAt.slice(0, 10) === a.dailyDate && p.completedAt?.slice(0, 10) === a.dailyDate &&
       Date.parse(p.completedAt) >= Date.parse(p.startedAt) && Date.parse(p.completedAt) <= now.getTime() &&
@@ -78,13 +79,13 @@ export function assignRanks<T extends { playerId: string; solves: number; unaide
 export function rankingWindow(launchDate: string, now: Date) {
   return { from: [launchDate, dateAt(Date.parse(`${dateAt(now.getTime())}T00:00:00Z`) - 29 * day)].sort()[1], through: dateAt(now.getTime()) };
 }
-export function buildRankings(plays: RankingPlay[], assignments: RankingAssignment[], players: { playerId: string; displayName: string; publicStats?: boolean }[], launchDate: string, now: Date): RankingRow[] {
+export function buildRankings(plays: RankingPlay[], assignments: RankingAssignment[], players: { playerId: string; displayName: string; publicStats?: boolean; identityKind?: "player" | "anonymous"; rankingEligibleFromDate?: string }[], launchDate: string, now: Date): RankingRow[] {
   const { from } = rankingWindow(launchDate, now);
   const groups = new Map<string, RankingPlay[]>();
   for (const p of plays) { const group = groups.get(p.playerId) ?? []; group.push(p); groups.set(p.playerId, group); }
-  const rows = players.filter((p) => p.publicStats !== false).map((player) => {
+  const rows = players.filter((p) => p.publicStats !== false && p.identityKind !== "anonymous").map((player) => {
     const history = groups.get(player.playerId) ?? [];
-    const eligible = eligibleDailyPlays(history, assignments, launchDate, now).filter((p) => p.dailyDate! >= from);
+    const eligible = eligibleDailyPlays(history, assignments, launchDate, now).filter((p) => p.dailyDate! >= from && (!player.rankingEligibleFromDate || p.dailyDate! >= player.rankingEligibleFromDate));
     return { playerId: player.playerId, displayName: player.displayName, solves: eligible.length, unaidedSolves: eligible.filter((p) => !p.hintCount).length, currentStreak: dailyStreaks(history, assignments, launchDate, now).current };
   }).filter((r) => r.solves > 0);
   return assignRanks(rows);

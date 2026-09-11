@@ -12,6 +12,12 @@
 
 Replace Emojizzle’s browser-only player identity with a lightweight, recoverable identity that still feels like **no account and no login** to the player.
 
+## Anonymous-play addition
+
+Players may now explicitly choose browser-only anonymous play instead of creating a recoverable named player. Anonymous sessions receive an opaque server-issued credential so normal puzzle actions and feedback remain durable, but they have no display name, recovery email, supported cross-device session, personal stats, or ranking eligibility. Clearing browser data abandons the credential and its play history. Existing named-player recovery behavior remains unchanged.
+
+An anonymous player can later create a named player. The earlier anonymous records remain separate, and the created player becomes ranking-eligible on the next UTC Daily so a puzzle viewed anonymously cannot be replayed for ranked credit.
+
 Real-world playtesting has now demonstrated that browser-local identity is not reliable enough. An iPhone user repeatedly lost his saved identity, was prompted to choose another name, and eventually progressed from `Mark` through multiple variants such as `Mark5` because his original names remained globally reserved.
 
 This feature should solve that failure mode while also enabling the same player to continue a Daily puzzle from another device.

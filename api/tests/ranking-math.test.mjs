@@ -73,6 +73,12 @@ test("public participation defaults on, explicit opt-out is excluded, equal metr
   assert.deepEqual(rows.map((r) => [r.playerId, r.rank]), [["a", 1], ["b", 2], ["c", 2], ["d", 4]]);
 });
 
+test("anonymous plays and players are excluded even if a client forges eligibility", () => {
+  const assignments = [assignment(0)];
+  assert.equal(eligibleDailyPlays([play(0, { identityKind: "anonymous", rankingEligible: true })], assignments, launch, now(1)).length, 0);
+  assert.deepEqual(buildRankings([play(0)], assignments, [{ playerId: "a", displayName: "Anonymous", identityKind: "anonymous" }], launch, now(1)), []);
+});
+
 test("streaks cross UTC year boundaries without local-time assumptions", () => {
   const a = assignment(0, { dailyDate: "2026-12-31" });
   const b = assignment(1, { dailyDate: "2027-01-01" });

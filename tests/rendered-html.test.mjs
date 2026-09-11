@@ -26,7 +26,7 @@ import {
   restoreOpaquePlayId,
   restorePracticeProgress,
 } from "../lib/play-state.ts";
-import { PLAYER_IDENTITY_KEY, normalizePlayerName, playerHeaders, readPlayerIdentity, savePlayerIdentity } from "../lib/player-identity.ts";
+import { LEGACY_PLAYER_IDENTITY_KEY, PLAYER_IDENTITY_KEY, migratePlayerIdentity, normalizePlayerName, playerHeaders, readPlayerIdentity, savePlayerIdentity } from "../lib/player-identity.ts";
 import { applyGameDataEpoch, GAME_DATA_EPOCH, GAME_DATA_EPOCH_KEY } from "../lib/game-data-epoch.ts";
 import { emojiTokens, normalizeEmojiSequence, puzzleListReturnUrl } from "../lib/admin-ui.ts";
 
@@ -55,16 +55,20 @@ test("returns to the saved puzzle anchor without losing list filters", () => {
 });
 
 test("persists only valid versioned player identities and builds credential headers", () => {
-  const identity = { playerId: "123e4567-e89b-42d3-a456-426614174000", displayName: "Puzzle Dad", sessionId: "223e4567-e89b-42d3-a456-426614174000", token: "a".repeat(43) };
+  const identity = { kind: "player", playerId: "123e4567-e89b-42d3-a456-426614174000", displayName: "Puzzle Dad", sessionId: "223e4567-e89b-42d3-a456-426614174000", token: "a".repeat(43) };
   const storage = memoryStorage(); savePlayerIdentity(storage, identity);
   assert.deepEqual(readPlayerIdentity(storage), identity);
   assert.deepEqual(playerHeaders(identity), { "x-emojizzle-player-id": identity.playerId, "x-emojizzle-player-session-id": identity.sessionId, "x-emojizzle-player-token": identity.token });
   assert.equal(normalizePlayerName("  PUZZLE   Dad ")?.normalizedDisplayName, "puzzle dad");
   assert.equal(readPlayerIdentity(memoryStorage({ [PLAYER_IDENTITY_KEY]: "broken" })), null);
+  const anonymous = { kind: "anonymous", playerId: "123e4567-e89b-42d3-a456-426614174001", sessionId: "223e4567-e89b-42d3-a456-426614174001", token: "b".repeat(43) };
+  savePlayerIdentity(storage, anonymous); assert.deepEqual(readPlayerIdentity(storage), anonymous);
+  const legacy = memoryStorage({ [LEGACY_PLAYER_IDENTITY_KEY]: JSON.stringify({ ...identity, kind: undefined }) });
+  assert.deepEqual(migratePlayerIdentity(legacy), identity); assert.equal(legacy.getItem(PLAYER_IDENTITY_KEY) !== null, true);
 });
 
 test("new game-data epoch clears old progress while preserving player identity", () => {
-  const identity = { playerId: "123e4567-e89b-42d3-a456-426614174000", displayName: "Puzzle Dad", sessionId: "223e4567-e89b-42d3-a456-426614174000", token: "a".repeat(43) };
+  const identity = { kind: "player", playerId: "123e4567-e89b-42d3-a456-426614174000", displayName: "Puzzle Dad", sessionId: "223e4567-e89b-42d3-a456-426614174000", token: "a".repeat(43) };
   const local = memoryStorage({
     [PLAYER_IDENTITY_KEY]: JSON.stringify(identity),
     "emojizzle-known-player:v1": JSON.stringify({ displayName: identity.displayName }),
@@ -298,6 +302,11 @@ test("keeps answers and credentials out of public payloads and includes the iden
   assert.doesNotMatch(statsUi, /stats\.challenges|Practice challenges/);
   assert.match(loader, /PlayerIdentityGate/);
   assert.match(gate, /Choose your player name/);
+  assert.match(gate, /Play anonymously/);
+  assert.match(gate, /Create my player/);
+  assert.match(gate, /anonymous-sessions/);
+  assert.match(gate, /anonymous-upgrade/);
+  assert.match(gate, /ClueTagProvider/);
   assert.match(gate, /players\/availability/);
   const sharingBlock = client.slice(client.indexOf("function shareUrl"), client.indexOf("function getAnonymousSessionId"));
   assert.doesNotMatch(sharingBlock, /identity|playerId|token/);
@@ -306,6 +315,7 @@ test("keeps answers and credentials out of public payloads and includes the iden
   assert.match(api, /anonymousSessionId/);
   assert.match(api, /players\/availability/);
   assert.match(api, /player-verifications\/confirm/);
+  assert.match(api, /anonymous-sessions/);
   assert.match(api, /player-sessions\/current/);
   assert.match(api, /plays\/start/);
   assert.match(api, /authenticatedPlayer/);
@@ -322,6 +332,8 @@ test("keeps answers and credentials out of public payloads and includes the iden
   assert.match(storage, /etag/);
   assert.match(admin, /New puzzle/);
   assert.match(feedbackAdmin, /Anonymous/);
+  assert.match(statsUi, /You’re playing anonymously/);
+  assert.match(statsUi, /Become a player/);
   assert.match(editor, /Saved and live/);
   assert.match(editor, /window\.location\.replace\(puzzleListReturnUrl\(returnTo, data\.number\)\)/);
   assert.match(editor, />Delete</);

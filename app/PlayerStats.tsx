@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { playerHeaders, type PlayerIdentity } from "../lib/player-identity";
+import { playerHeaders, type BrowserIdentity, type PlayerIdentity } from "../lib/player-identity";
 import type { PlayerGlance, PlayerStats as Stats, PlaySummary, RankingsPage } from "../lib/player-stats";
 
 function dateLabel(value: string) {
@@ -34,7 +34,33 @@ function Summary({ title, summary }: { title: string; summary: PlaySummary }) {
 
 type StatsView = "daily" | "rankings" | "practice";
 
-export function PlayerStatsPanel({ identity, onClose, initialView = "daily" }: { identity: PlayerIdentity; onClose: () => void; initialView?: StatsView }) {
+export function PlayerStatsPanel({ identity, onClose, initialView = "daily", onBecomePlayer, upgradeReady = false }: { identity: BrowserIdentity; onClose: () => void; initialView?: StatsView; onBecomePlayer: () => void; upgradeReady?: boolean }) {
+  if (identity.kind === "anonymous") return <AnonymousRankingsPanel onClose={onClose} onBecomePlayer={onBecomePlayer} upgradeReady={upgradeReady} />;
+  return <NamedPlayerStatsPanel identity={identity} onClose={onClose} initialView={initialView} />;
+}
+
+function AnonymousRankingsPanel({ onClose, onBecomePlayer, upgradeReady }: { onClose: () => void; onBecomePlayer: () => void; upgradeReady: boolean }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [board, setBoard] = useState<RankingsPage | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const element = dialog.current; const previousFocus = document.activeElement as HTMLElement | null; const overflow = document.body.style.overflow;
+    element?.showModal(); document.body.style.overflow = "hidden";
+    fetch("/api/rankings?window=30d").then(readResponse<RankingsPage>).then(setBoard).catch((reason) => setError(reason instanceof Error ? reason.message : "Rankings could not load.")).finally(() => setLoading(false));
+    return () => { element?.close(); document.body.style.overflow = overflow; previousFocus?.focus(); };
+  }, []);
+  return <dialog ref={dialog} className="stats-dialog" aria-labelledby="anonymous-rankings-title" onCancel={(event) => { event.preventDefault(); onClose(); }}>
+    <div className="stats-heading"><div><p className="stats-eyebrow">Anonymous play</p><h2 id="anonymous-rankings-title">Daily rankings</h2></div><button className="stats-close" type="button" onClick={onClose} aria-label="Close rankings and return to puzzle">✕</button></div>
+    <p className="anonymous-rankings-note">You’re playing anonymously, so your results won’t appear here.</p>
+    {upgradeReady ? <p className="anonymous-upgrade-ready">You’re set—your player starts with tomorrow’s Daily.</p> : <div className="stats-preference"><strong>Want to join in?</strong><p>Create a player to choose a name, keep future Daily play across devices, and appear in rankings. Earlier anonymous play stays anonymous.</p><button className="primary-button" type="button" onClick={onBecomePlayer}>Become a player</button></div>}
+    <p>Most Daily solves in the last 30 days, then most solves without hints. Equal totals share a rank.</p>
+    {loading && <p role="status">Loading Daily rankings…</p>}{error && <p role="alert">{error}</p>}
+    {board && <><p className="stats-note">{dateLabel(board.from)} – {dateLabel(board.through)} UTC · Updated {timestamp(board.asOf)}.</p>{board.rows.length ? <div className="rankings-table-wrap"><table className="rankings-table"><caption>Daily rankings · {board.total} players</caption><thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col">Solves</th><th scope="col">Unaided</th><th scope="col">Streak</th></tr></thead><tbody>{board.rows.map((row) => <tr key={row.displayName}><td>{row.rank}</td><th scope="row">{row.displayName}</th><td>{row.solves}</td><td>{row.unaidedSolves}</td><td>{row.currentStreak}</td></tr>)}</tbody></table></div> : <p>No ranked solves yet.</p>}</>}
+  </dialog>;
+}
+
+function NamedPlayerStatsPanel({ identity, onClose, initialView = "daily" }: { identity: PlayerIdentity; onClose: () => void; initialView?: StatsView }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [tab, setTab] = useState<StatsView>(initialView);
   const [window, setWindow] = useState<"all" | "30d">("all");

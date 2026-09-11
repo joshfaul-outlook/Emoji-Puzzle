@@ -20,7 +20,7 @@ import {
   type Resolution,
 } from "../lib/play-state";
 import { feedbackPlayFields } from "../lib/feedback-payload";
-import { playerHeaders, type PlayerIdentity } from "../lib/player-identity";
+import { playerHeaders, type BrowserIdentity } from "../lib/player-identity";
 import { BrandWordmark } from "./components/BrandWordmark";
 import { KnowingMark } from "./components/KnowingMark";
 import { DailyStreak, PlayerStatsPanel, ProgressStrip } from "./PlayerStats";
@@ -47,8 +47,10 @@ function freshPlay(): PlayState {
 
 type DailyPuzzleProps = {
   puzzle: PublicPuzzle;
-  identity: PlayerIdentity;
+  identity: BrowserIdentity;
   invalidateIdentity: () => void;
+  beginUpgrade: () => void;
+  upgradeReady: boolean;
   nextPuzzleNumber?: number;
   challengeBenchmark?: ChallengeBenchmark | null;
   resumePractice?: boolean;
@@ -64,6 +66,8 @@ export function DailyPuzzle({
   puzzle,
   identity,
   invalidateIdentity,
+  beginUpgrade,
+  upgradeReady,
   nextPuzzleNumber,
   challengeBenchmark = null,
   resumePractice = false,
@@ -528,11 +532,11 @@ export function DailyPuzzle({
             </svg>
             <span>Share</span>
           </button>
-          <button className="player-chip player-stats-button" type="button" onClick={() => { setStatsView(puzzle.context === "practice" ? "practice" : "daily"); setStatsOpen(true); }} aria-label={`Stats & rankings for ${identity.displayName}`} title="Stats & rankings"><span className="player-chip-name">{identity.displayName}</span><span>Stats</span></button>
+          <button className="player-chip player-stats-button" type="button" onClick={() => { setStatsView(identity.kind === "anonymous" ? "rankings" : puzzle.context === "practice" ? "practice" : "daily"); setStatsOpen(true); }} aria-label={identity.kind === "anonymous" ? "Anonymous play and rankings" : `Stats & rankings for ${identity.displayName}`} title={identity.kind === "anonymous" ? "Anonymous play and rankings" : "Stats & rankings"}>{identity.kind === "anonymous" ? <><span>Anonymous</span><span>Rankings</span></> : <><span className="player-chip-name">{identity.displayName}</span><span>Stats</span></>}</button>
         </div>
       </header>
 
-      {statsOpen && <PlayerStatsPanel identity={identity} initialView={statsView} onClose={() => { setStatsOpen(false); setStatsRefresh((value) => value + 1); }} />}
+      {statsOpen && <PlayerStatsPanel identity={identity} initialView={statsView} onBecomePlayer={beginUpgrade} upgradeReady={upgradeReady} onClose={() => { setStatsOpen(false); setStatsRefresh((value) => value + 1); }} />}
 
       <nav className="mode-switch" aria-label="Game mode">
         <button
@@ -553,7 +557,7 @@ export function DailyPuzzle({
         </button>
       </nav>
 
-      {(puzzle.context === "daily" || puzzle.context === "practice") && (
+      {identity.kind === "player" && (puzzle.context === "daily" || puzzle.context === "practice") && (
         <ProgressStrip identity={identity} mode={puzzle.context} outcome={play.outcome} refreshKey={`${play.outcome}:${statsRefresh}`} onOpen={() => { setStatsView(puzzle.context === "daily" ? "rankings" : "practice"); setStatsOpen(true); }} />
       )}
 
@@ -666,7 +670,7 @@ export function DailyPuzzle({
           <div className="category-pill">{play.resolution?.category}</div>
           <h1 id="result-title">{play.resolution?.answer}</h1>
           <p className="explanation">{play.resolution?.explanation}</p>
-          {puzzle.context === "daily" && <DailyStreak identity={identity} />}
+          {puzzle.context === "daily" && identity.kind === "player" && <DailyStreak identity={identity} />}
 
           <div className="result-stats" aria-label="Your result">
             <div><strong>{play.guessCount}</strong><span>{play.guessCount === 1 ? "guess" : "guesses"}</span></div>

@@ -61,12 +61,14 @@ export function GameLoader({ mode }: { mode: LoaderMode }) {
       ? { outcome, guessCount: guesses, hintCount: hints }
       : null;
 
-  return <PlayerIdentityGate>{(identity, invalidateIdentity) => (
+  return <PlayerIdentityGate>{(identity, invalidateIdentity, beginUpgrade, upgradeReady) => (
     <DailyPuzzle
       key={`${result.puzzle.context}:${result.puzzle.id}:${identity.playerId}`}
       puzzle={result.puzzle}
       identity={identity}
       invalidateIdentity={invalidateIdentity}
+      beginUpgrade={beginUpgrade}
+      upgradeReady={upgradeReady}
       nextPuzzleNumber={result.nextPuzzleNumber}
       challengeBenchmark={challengeBenchmark}
       resumePractice={mode === "practice" && !query.has("puzzle") && !query.has("challenge")}

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import azureFunctions from "@azure/functions";
 const { HttpRequest, InvocationContext } = azureFunctions;
 import { TableClient } from "@azure/data-tables";
-import { createPlayerWithSession, createPuzzle, applyPlayAction, deletePuzzle, getPuzzle, getPlayer, setPublicStats, listPlays, listPuzzles, startPlay, playerTable, puzzleTable, updatePuzzle } from "../dist/src/storage.js";
+import { createAnonymousPlayerWithSession, createPlayerWithSession, createPuzzle, applyPlayAction, deletePuzzle, getPuzzle, getPlayer, setPublicStats, listPlays, listPuzzles, startPlay, playerTable, puzzleTable, updatePuzzle } from "../dist/src/storage.js";
 import { hashPlayerToken } from "../dist/src/player-identity.js";
 import { ensureDailyAssignment, getDailyAssignment, getRankingsLaunchDate, voidDailyAssignment, recordPublicExposure } from "../dist/src/daily-schedule.js";
 import { playerGlance, playerStats, rankingsPage } from "../dist/src/rankings.js";
@@ -86,6 +86,13 @@ test("rankings storage, schedule and authenticated API integration", async (t) =
     const response = await myStats(request(`players/me/stats?playerId=${ada.player.playerId}`, bob), context);
     assert.equal(response.status, 200); assert.equal(response.jsonBody.daily.started, 0);
     assert.equal(response.headers["cache-control"], "no-store");
+  });
+  await t.test("anonymous sessions can play but cannot request personal stats or rankings preferences", async () => {
+    const anonymous = await createAnonymousPlayerWithSession({ playerId: randomUUID(), sessionId: randomUUID(), tokenHash: hashPlayerToken(token) });
+    const identity = { player: anonymous.player, session: anonymous.session };
+    assert.equal((await myStats(request("players/me/stats", identity), context)).status, 403);
+    assert.equal((await myGlance(request("players/me/glance", identity), context)).status, 403);
+    assert.equal((await playerPreferences(request("players/me/preferences", identity, { publicStats: true }, "PATCH"), context)).status, 403);
   });
   await t.test("public preview and context spoofing cannot reveal Daily answers", async () => {
     assert.equal((await currentPuzzle(request("puzzles/current?mode=next"))).status, 403);

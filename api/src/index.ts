@@ -5,7 +5,7 @@ import { body, json, requireAdmin, requireOrigin } from "./http.js";
 import { parseGameLaunchDate } from "./game-config.js";
 import { isAcceptedGuess, validatePuzzle, type PuzzlePool, type PuzzleStatus, type StoredPuzzle } from "./model.js";
 import { createPlayerToken, createVerificationCode, hashPlayerToken, hashVerificationCode, normalizePlayerName, normalizeRecoveryEmail, playerTokenMatches, recoveryEmailKey, verificationClientKey, verificationCodeMatches } from "./player-identity.js";
-import { applyPlayAction, consumeVerificationChallenge, createPlayerSession, createPlayerWithSession, createVerificationChallenge, deletePuzzle, getPlay, getPlayer, getPlayerByEmailKey, getPlayerByNormalizedName, getPlayerSession, getVerificationChallenge, insertFeedback, listFeedback, listPlayerSessions, listPuzzles, markFeedbackSubmitted, NameUnavailableError, playerNameAvailable, PlayConflictError, recordVerificationFailure, revokePlayerSession, startPlay, touchPlayer, touchPlayerSession, VerificationConflictError, VerificationRateLimitError, createPuzzle, getPuzzle, updatePuzzle, type PlayContext, type PlayerRecord, type PlayerSession, type VerificationPurpose, setPublicStats } from "./storage.js";
+import { applyPlayAction, consumeVerificationChallenge, createAnonymousPlayerWithSession, createPlayerSession, createPlayerWithSession, createVerificationChallenge, deletePuzzle, getPlay, getPlayer, getPlayerByEmailKey, getPlayerByNormalizedName, getPlayerSession, getVerificationChallenge, insertFeedback, listFeedback, listPlayerSessions, listPuzzles, markFeedbackSubmitted, NameUnavailableError, playerNameAvailable, PlayConflictError, recordVerificationFailure, revokePlayerSession, startPlay, touchPlayer, touchPlayerSession, VerificationConflictError, VerificationRateLimitError, createPuzzle, getPuzzle, updatePuzzle, type PlayContext, type PlayerRecord, type PlayerSession, type VerificationPurpose, setPublicStats } from "./storage.js";
 import { suggestPuzzle } from "./suggestions.js";
 import { verificationSender } from "./verification-sender.js";
 import { adminScheduleState, currentDaily, ensureDailyAssignment, getDailyAssignment, listDailyAssignments, recordPublicExposure, utcDate, voidDailyAssignment } from "./daily-schedule.js";
@@ -158,7 +158,7 @@ export async function feedback(request: HttpRequest, context: InvocationContext)
   const play = await getPlay(identity.player.playerId, payload.playId as string);
   if (!play || play.puzzleId !== puzzle.id || play.pool !== pool || play.outcome === "playing") return json({ error: "Completed play required" }, 409);
   if (play.feedbackSubmittedAt) return json({ saved: true });
-  await insertFeedback({ puzzleId: puzzle.id, puzzleNumber: puzzle.number, puzzlePool: pool, rating: payload.rating, comment, playId: play.playId, anonymousSessionId: payload.anonymousSessionId.slice(0,80), playerId: identity.player.playerId, displayName: identity.player.displayName, outcome: play.outcome, guessCount: play.guessCount, hintCount: play.hintCount, metadataJson: JSON.stringify(payload.metadata ?? {}).slice(0,2000) });
+  await insertFeedback({ puzzleId: puzzle.id, puzzleNumber: puzzle.number, puzzlePool: pool, rating: payload.rating, comment, playId: play.playId, anonymousSessionId: payload.anonymousSessionId.slice(0,80), playerId: identity.player.playerId, identityKind: identity.player.identityKind, ...(identity.player.identityKind === "player" ? { displayName: identity.player.displayName } : {}), outcome: play.outcome, guessCount: play.guessCount, hintCount: play.hintCount, metadataJson: JSON.stringify(payload.metadata ?? {}).slice(0,2000) });
   await markFeedbackSubmitted(identity.player.playerId, play.playId);
   return json({ saved: true }, 201);
 }
@@ -170,13 +170,22 @@ async function playerAvailability(request: HttpRequest) {
 }
 
 function publicIdentity(player: PlayerRecord, sessionId: string, token: string) {
-  return { playerId: player.playerId, displayName: player.displayName, sessionId, token };
+  return player.identityKind === "anonymous"
+    ? { kind: "anonymous" as const, playerId: player.playerId, sessionId, token }
+    : { kind: "player" as const, playerId: player.playerId, displayName: player.displayName, sessionId, token };
 }
 
-async function playerVerifications(request: HttpRequest) {
+function publicSessionIdentity(player: PlayerRecord, sessionId: string) {
+  return player.identityKind === "anonymous"
+    ? { kind: "anonymous" as const, playerId: player.playerId, sessionId }
+    : { kind: "player" as const, playerId: player.playerId, displayName: player.displayName, sessionId };
+}
+
+async function playerVerifications(request: HttpRequest, context: InvocationContext) {
   const denied = requireOrigin(request); if (denied) return denied;
-  const payload = await body<{ purpose?: VerificationPurpose; displayName?: string; email?: string }>(request);
-  const purpose = payload?.purpose === "create" || payload?.purpose === "recover" ? payload.purpose : null;
+  const payload = await body<{ purpose?: VerificationPurpose; displayName?: string; email?: string; source?: "anonymous-upgrade" }>(request);
+  const requestedPurpose = payload?.purpose === "create" || payload?.purpose === "recover" || payload?.purpose === "anonymous-upgrade" ? payload.purpose : null;
+  const purpose = payload?.source === "anonymous-upgrade" && requestedPurpose === "create" ? "anonymous-upgrade" : requestedPurpose;
   const email = normalizeRecoveryEmail(payload?.email);
   if (!purpose || !email) return json({ error: "Enter a valid email address." }, 400);
   const emailKey = recoveryEmailKey(email);
@@ -184,7 +193,11 @@ async function playerVerifications(request: HttpRequest) {
   const clientKey = clientAddress ? verificationClientKey(clientAddress) : undefined;
   let proposedName: ReturnType<typeof normalizePlayerName> = null;
   let player: PlayerRecord | null = null;
-  if (purpose === "create") {
+  if (purpose === "create" || purpose === "anonymous-upgrade") {
+    if (purpose === "anonymous-upgrade") {
+      const identity = await authenticatedPlayer(request, context); if ("denied" in identity) return identity.denied;
+      if (identity.player.identityKind !== "anonymous") return json({ error: "Only anonymous play can be upgraded here." }, 409);
+    }
     proposedName = normalizePlayerName(payload?.displayName);
     if (!proposedName) return json({ error: "Use 3–20 letters, numbers, spaces, _ or -." }, 400);
     if (!await playerNameAvailable(proposedName.normalizedDisplayName)) return json({ error: "That display name is already taken." }, 409);
@@ -227,10 +240,12 @@ async function confirmPlayerVerification(request: HttpRequest) {
   try { await consumeVerificationChallenge(challenge); }
   catch (error) { if (error instanceof VerificationConflictError) return json({ error: "That verification code was already used." }, 409); throw error; }
   const sessionId = randomUUID(); const token = createPlayerToken();
-  if (challenge.purpose === "create") {
+  if (challenge.purpose === "create" || challenge.purpose === "anonymous-upgrade") {
     if (!challenge.proposedDisplayName || !challenge.normalizedDisplayName) return json({ error: "That verification request is incomplete." }, 400);
     try {
-      const result = await createPlayerWithSession({ playerId: randomUUID(), displayName: challenge.proposedDisplayName, normalizedDisplayName: challenge.normalizedDisplayName, recoveryEmailKey: challenge.emailKey, sessionId, tokenHash: hashPlayerToken(token) });
+      const rankingEligibleFromDate = challenge.purpose === "anonymous-upgrade" ? new Date(Date.now() + 86_400_000).toISOString().slice(0, 10) : undefined;
+      const result = await createPlayerWithSession({ playerId: randomUUID(), displayName: challenge.proposedDisplayName, normalizedDisplayName: challenge.normalizedDisplayName, recoveryEmailKey: challenge.emailKey, sessionId, tokenHash: hashPlayerToken(token), rankingEligibleFromDate });
+      if (challenge.purpose === "anonymous-upgrade") return json({ ...publicIdentity(result.player, sessionId, token), activatesAt: `${rankingEligibleFromDate}T00:00:00Z` }, 201);
       return json(publicIdentity(result.player, sessionId, token), 201);
     } catch (error) {
       if (error instanceof NameUnavailableError) return json({ error: "That player name or email was claimed while you verified. Please start again." }, 409);
@@ -244,6 +259,13 @@ async function confirmPlayerVerification(request: HttpRequest) {
   return json(publicIdentity(player, sessionId, token), 201);
 }
 
+async function anonymousSession(request: HttpRequest) {
+  const denied = requireOrigin(request); if (denied) return denied;
+  const sessionId = randomUUID(); const token = createPlayerToken();
+  const result = await createAnonymousPlayerWithSession({ playerId: randomUUID(), sessionId, tokenHash: hashPlayerToken(token) });
+  return json(publicIdentity(result.player, sessionId, token), 201);
+}
+
 async function currentPlayerSession(request: HttpRequest, context: InvocationContext) {
   const denied = requireOrigin(request); if (denied) return denied;
   const identity = await authenticatedPlayer(request, context); if ("denied" in identity) return identity.denied;
@@ -251,7 +273,7 @@ async function currentPlayerSession(request: HttpRequest, context: InvocationCon
     await revokePlayerSession(identity.session.sessionId);
     return json({ revoked: true });
   }
-  return json({ playerId: identity.player.playerId, displayName: identity.player.displayName, sessionId: identity.session.sessionId });
+  return json(publicSessionIdentity(identity.player, identity.session.sessionId));
 }
 
 export async function playsStart(request: HttpRequest, context: InvocationContext) {
@@ -267,7 +289,8 @@ export async function playsStart(request: HttpRequest, context: InvocationContex
   if (puzzle.pool === "practice" && payload.context !== "author-test") await recordPublicExposure(puzzle.id);
   try {
     const assignment = daily?.assignment;
-    const result = await startPlay({ playerId: identity.player.playerId, playId: payload.playId!, puzzleId: puzzle.id, puzzleNumber: puzzle.number, pool: puzzle.pool, context: payload.context!, rankingEligible: Boolean(assignment && !assignment.void),
+    const rankingEligible = Boolean(assignment && !assignment.void && identity.player.identityKind === "player" && (!identity.player.rankingEligibleFromDate || assignment.dailyDate >= identity.player.rankingEligibleFromDate));
+    const result = await startPlay({ playerId: identity.player.playerId, identityKind: identity.player.identityKind, playId: payload.playId!, puzzleId: puzzle.id, puzzleNumber: puzzle.number, pool: puzzle.pool, context: payload.context!, rankingEligible,
       ...(assignment ? { dailyDate: assignment.dailyDate, puzzleRevision: assignment.revision!, rankingOutcome: "pending" as const } : {}) });
     return json({
       play: result.play,
@@ -279,17 +302,20 @@ export async function playsStart(request: HttpRequest, context: InvocationContex
 
 export async function myStats(request: HttpRequest, context: InvocationContext) {
   const identity = await authenticatedPlayer(request, context); if ("denied" in identity) return identity.denied;
+  if (identity.player.identityKind === "anonymous") return json({ error: "Anonymous players do not have personal stats.", code: "ANONYMOUS_PLAYER" }, 403);
   const window = request.query.get("window") ?? "all";
   if (window !== "all" && window !== "30d") return json({ error: "Invalid stats window" }, 400);
   return json(await playerStats(identity.player, window));
 }
 export async function myGlance(request: HttpRequest, context: InvocationContext) {
   const identity = await authenticatedPlayer(request, context); if ("denied" in identity) return identity.denied;
+  if (identity.player.identityKind === "anonymous") return json({ error: "Anonymous players do not have personal stats.", code: "ANONYMOUS_PLAYER" }, 403);
   return json(await playerGlance(identity.player));
 }
 export async function playerPreferences(request: HttpRequest, context: InvocationContext) {
   const denied = requireOrigin(request); if (denied) return denied;
   const identity = await authenticatedPlayer(request, context); if ("denied" in identity) return identity.denied;
+  if (identity.player.identityKind === "anonymous") return json({ error: "Anonymous players cannot change ranking preferences.", code: "ANONYMOUS_PLAYER" }, 403);
   const payload = await body<{ publicStats?: boolean }>(request);
   if (typeof payload?.publicStats !== "boolean") return json({ error: "Choose whether to show Daily stats publicly" }, 400);
   await setPublicStats(identity.player.playerId, payload.publicStats);
@@ -373,6 +399,7 @@ async function adminPlayerSupport(request: HttpRequest) {
   if (!normalized) return json({ error: "Enter an exact player name." }, 400);
   const player = await getPlayerByNormalizedName(normalized.normalizedDisplayName);
   if (!player) return json({ error: "Player not found" }, 404);
+  if (player.identityKind !== "player") return json({ error: "Player not found" }, 404);
   const sessions = await listPlayerSessions(player.playerId);
   return json({
     player: {
@@ -405,6 +432,7 @@ app.http("currentPuzzle", { methods: ["GET"], authLevel: "anonymous", route: "pu
 app.http("playerAvailability", { methods: ["GET"], authLevel: "anonymous", route: "players/availability", handler: handle(playerAvailability) });
 app.http("playerVerifications", { methods: ["POST"], authLevel: "anonymous", route: "player-verifications", handler: handle(playerVerifications) });
 app.http("confirmPlayerVerification", { methods: ["POST"], authLevel: "anonymous", route: "player-verifications/confirm", handler: handle(confirmPlayerVerification) });
+app.http("anonymousSession", { methods: ["POST"], authLevel: "anonymous", route: "anonymous-sessions", handler: handle(anonymousSession) });
 app.http("currentPlayerSession", { methods: ["GET", "DELETE"], authLevel: "anonymous", route: "player-sessions/current", handler: handle(currentPlayerSession) });
 app.http("playsStart", { methods: ["POST"], authLevel: "anonymous", route: "plays/start", handler: handle(playsStart) });
 app.http("guess", { methods: ["POST"], authLevel: "anonymous", route: "guess", handler: handle(guess) });

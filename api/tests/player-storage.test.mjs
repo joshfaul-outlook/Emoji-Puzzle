@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { TableClient } from "@azure/data-tables";
-import { applyPlayAction, consumeVerificationChallenge, createPlayerSession, createPlayerWithSession, createVerificationChallenge, feedbackTable, getPlay, getPlayerSession, getVerificationChallenge, insertFeedback, listFeedback, NameUnavailableError, playerNameAvailable, revokePlayerSession, startPlay, VerificationRateLimitError } from "../dist/src/storage.js";
+import { applyPlayAction, consumeVerificationChallenge, createAnonymousPlayerWithSession, createPlayerSession, createPlayerWithSession, createVerificationChallenge, feedbackTable, getPlayer, getPlayerByEmailKey, getPlayerByNormalizedName, getPlay, getPlayerSession, getVerificationChallenge, insertFeedback, listFeedback, NameUnavailableError, playerNameAvailable, revokePlayerSession, startPlay, VerificationRateLimitError } from "../dist/src/storage.js";
 import { hashPlayerToken, hashVerificationCode, verificationCodeMatches } from "../dist/src/player-identity.js";
 
 const connection = process.env.TABLE_STORAGE_CONNECTION_STRING;
@@ -34,6 +34,20 @@ test("supports independent revocable sessions for one player", async () => {
   await revokePlayerSession(second.sessionId);
   assert.ok((await getPlayerSession(second.sessionId))?.revokedAt);
   assert.equal((await getPlayerSession(created.session.sessionId))?.revokedAt, null);
+});
+
+test("anonymous players have only opaque, revocable identity and never receive ranking credit", async () => {
+  const playerId = randomUUID(); const sessionId = randomUUID(); const tokenHash = hashPlayerToken("c".repeat(43));
+  const created = await createAnonymousPlayerWithSession({ playerId, sessionId, tokenHash });
+  assert.deepEqual(created.player, { playerId, identityKind: "anonymous", publicStats: false, createdAt: created.player.createdAt, lastSeenAt: created.player.lastSeenAt });
+  assert.equal((await getPlayer(playerId))?.identityKind, "anonymous");
+  assert.equal(await getPlayerByEmailKey(randomUUID().replaceAll("-", "").padEnd(64, "3")), null);
+  assert.equal(await getPlayerByNormalizedName(`anonymous-${randomUUID()}`), null);
+  const started = await startPlay({ playerId, identityKind: "anonymous", playId: randomUUID(), puzzleId: `anonymous-${randomUUID()}`, puzzleNumber: 1, pool: "daily", context: "daily", rankingEligible: true });
+  assert.equal(started.play.rankingEligible, false);
+  assert.equal(started.play.identityKind, "anonymous");
+  await revokePlayerSession(sessionId);
+  assert.ok((await getPlayerSession(sessionId))?.revokedAt);
 });
 
 test("stores hashed, expiring, single-use verification challenges", async () => {
@@ -87,4 +101,11 @@ test("returns attributed and legacy feedback together", async () => {
   assert.equal(attributed?.displayName, "PuzzleDad"); assert.equal(attributed?.playerId, suffix);
   assert.equal(rows.filter((row) => row.puzzleId === `new-${suffix}`).length, 1);
   assert.equal(legacy?.displayName, null); assert.equal(legacy?.playerId, null);
+});
+
+test("anonymous feedback is durable but contains no display name", async () => {
+  const suffix = randomUUID();
+  await insertFeedback({ puzzleId: `anonymous-${suffix}`, puzzleNumber: 1, puzzlePool: "daily", rating: "up", comment: null, playId: suffix, anonymousSessionId: "opaque", playerId: suffix, identityKind: "anonymous", outcome: "solved", guessCount: 1, hintCount: 0, metadataJson: "{}" });
+  const row = (await listFeedback(500)).find((item) => item.puzzleId === `anonymous-${suffix}`);
+  assert.equal(row?.identityKind, "anonymous"); assert.equal(row?.displayName, "Anonymous");
 });

@@ -130,18 +130,31 @@ export async function deletePuzzle(existing: StoredPuzzle, etag: string) {
   await puzzleTable().deleteEntity("Puzzle", existing.id, { etag });
 }
 
-export type PlayerRecord = {
+export type PlayerIdentityKind = "player" | "anonymous";
+type PlayerRecordBase = {
   playerId: string;
+  identityKind: PlayerIdentityKind;
   publicStats: boolean;
+  createdAt: string;
+  lastSeenAt: string;
+};
+export type NamedPlayerRecord = PlayerRecordBase & {
+  identityKind: "player";
   displayName: string;
   normalizedDisplayName: string;
   recoveryEmailKey: string;
   recoveryVerifiedAt: string;
-  createdAt: string;
-  lastSeenAt: string;
+  // A player made from anonymous play cannot receive credit before this date.
+  rankingEligibleFromDate?: string;
 };
+export type AnonymousPlayerRecord = PlayerRecordBase & { identityKind: "anonymous" };
+export type PlayerRecord = NamedPlayerRecord | AnonymousPlayerRecord;
 
-type PlayerEntity = TableEntity & PlayerRecord;
+type PlayerEntity = TableEntity & {
+  playerId: string; identityKind?: PlayerIdentityKind; publicStats?: boolean;
+  displayName?: string; normalizedDisplayName?: string; recoveryEmailKey?: string; recoveryVerifiedAt?: string; rankingEligibleFromDate?: string;
+  createdAt: string; lastSeenAt: string;
+};
 
 export type PlayerSession = {
   sessionId: string;
@@ -154,7 +167,7 @@ export type PlayerSession = {
 
 type PlayerSessionEntity = TableEntity & Omit<PlayerSession, "revokedAt"> & { revokedAt?: string };
 
-export type VerificationPurpose = "create" | "recover";
+export type VerificationPurpose = "create" | "recover" | "anonymous-upgrade";
 export type VerificationChallenge = {
   challengeId: string;
   purpose: VerificationPurpose;
@@ -209,10 +222,12 @@ export async function createPlayerWithSession(input: {
   recoveryEmailKey: string;
   sessionId: string;
   tokenHash: string;
+  rankingEligibleFromDate?: string;
 }) {
   const now = new Date().toISOString();
   const record: PlayerRecord = {
     playerId: input.playerId,
+    identityKind: "player",
     publicStats: true,
     displayName: input.displayName,
     normalizedDisplayName: input.normalizedDisplayName,
@@ -220,6 +235,7 @@ export async function createPlayerWithSession(input: {
     recoveryVerifiedAt: now,
     createdAt: now,
     lastSeenAt: now,
+    ...(input.rankingEligibleFromDate ? { rankingEligibleFromDate: input.rankingEligibleFromDate } : {}),
   };
   const transaction = new TableTransaction();
   transaction.createEntity({ partitionKey: "Players", rowKey: `player:${input.playerId}`, ...record });
@@ -238,7 +254,8 @@ export async function createPlayerWithSession(input: {
 export async function getPlayer(playerId: string) {
   try {
     const entity = await playerTable().getEntity<PlayerEntity>("Players", `player:${playerId}`);
-    return { playerId: entity.playerId, publicStats: entity.publicStats !== false, displayName: entity.displayName, normalizedDisplayName: entity.normalizedDisplayName, recoveryEmailKey: entity.recoveryEmailKey, recoveryVerifiedAt: entity.recoveryVerifiedAt, createdAt: entity.createdAt, lastSeenAt: entity.lastSeenAt } satisfies PlayerRecord;
+    if (entity.identityKind === "anonymous") return { playerId: entity.playerId, identityKind: "anonymous", publicStats: false, createdAt: entity.createdAt, lastSeenAt: entity.lastSeenAt } satisfies AnonymousPlayerRecord;
+    return { playerId: entity.playerId, identityKind: "player", publicStats: entity.publicStats !== false, displayName: entity.displayName ?? "", normalizedDisplayName: entity.normalizedDisplayName ?? "", recoveryEmailKey: entity.recoveryEmailKey ?? "", recoveryVerifiedAt: entity.recoveryVerifiedAt ?? "", createdAt: entity.createdAt, lastSeenAt: entity.lastSeenAt, ...(entity.rankingEligibleFromDate ? { rankingEligibleFromDate: entity.rankingEligibleFromDate } : {}) } satisfies NamedPlayerRecord;
   } catch (error) {
     if ((error as { statusCode?: number }).statusCode === 404) return null;
     throw error;
@@ -252,16 +269,30 @@ export async function touchPlayer(player: PlayerRecord) {
 }
 
 export async function listRankingPlayers() {
-  const players: { playerId: string; displayName: string; publicStats: boolean }[] = [];
+  const players: { playerId: string; displayName: string; publicStats: boolean; identityKind: PlayerIdentityKind; rankingEligibleFromDate?: string }[] = [];
   for await (const entity of playerTable().listEntities<PlayerEntity>({ queryOptions: {
     filter: "PartitionKey eq 'Players' and RowKey ge 'player:' and RowKey lt 'player;'",
-    select: ["playerId", "displayName", "publicStats"],
-  } })) players.push({ playerId: entity.playerId, displayName: entity.displayName, publicStats: entity.publicStats !== false });
+    select: ["playerId", "displayName", "publicStats", "identityKind", "rankingEligibleFromDate"],
+  } })) {
+    const identityKind = entity.identityKind === "anonymous" ? "anonymous" : "player";
+    if (identityKind === "player") players.push({ playerId: entity.playerId, displayName: entity.displayName ?? "", publicStats: entity.publicStats !== false, identityKind, ...(entity.rankingEligibleFromDate ? { rankingEligibleFromDate: entity.rankingEligibleFromDate } : {}) });
+  }
   return players;
 }
 
 export async function setPublicStats(playerId: string, publicStats: boolean) {
   await playerTable().updateEntity({ partitionKey: "Players", rowKey: `player:${playerId}`, publicStats }, "Merge", { etag: "*" });
+}
+
+export async function createAnonymousPlayerWithSession(input: { playerId: string; sessionId: string; tokenHash: string }) {
+  const now = new Date().toISOString();
+  const player: AnonymousPlayerRecord = { playerId: input.playerId, identityKind: "anonymous", publicStats: false, createdAt: now, lastSeenAt: now };
+  const session: PlayerSession = { ...input, createdAt: now, lastSeenAt: now, revokedAt: null };
+  const transaction = new TableTransaction();
+  transaction.createEntity({ partitionKey: "Players", rowKey: `player:${input.playerId}`, ...player });
+  transaction.createEntity({ partitionKey: "Players", rowKey: `session:${input.sessionId}`, sessionId: input.sessionId, playerId: input.playerId, tokenHash: input.tokenHash, createdAt: now, lastSeenAt: now });
+  await playerTable().submitTransaction(transaction.actions);
+  return { player, session };
 }
 
 export async function getPlayerByEmailKey(emailKey: string) {
@@ -400,6 +431,7 @@ export async function consumeVerificationChallenge(challenge: VerificationChalle
 export type PlayContext = "daily" | "practice" | "challenge" | "author-test";
 export type PuzzlePlay = {
   playerId: string; playId: string; puzzleId: string; puzzleNumber: number; pool: PuzzlePool; context: PlayContext; rankingEligible: boolean;
+  identityKind: PlayerIdentityKind;
   startedAt: string; lastActionAt: string; completedAt: string | null; guessCount: number; hintCount: number;
   outcome: "playing" | "solved" | "revealed"; feedbackSubmittedAt: string | null; createdAt: string; updatedAt: string;
   dailyDate?: string; puzzleRevision?: string; rankingOutcome?: "pending" | "solved" | "revealed" | "late" | "ineligible";
@@ -408,7 +440,7 @@ export type PuzzlePlay = {
 type PlayEntity = TableEntity & Omit<PuzzlePlay, "completedAt" | "feedbackSubmittedAt"> & { completedAt?: string; feedbackSubmittedAt?: string };
 
 function fromPlayEntity(entity: PlayEntity): PuzzlePlay {
-  return { playerId: entity.playerId, playId: entity.playId, puzzleId: entity.puzzleId, puzzleNumber: entity.puzzleNumber, pool: entity.pool, context: entity.context, rankingEligible: entity.rankingEligible, startedAt: entity.startedAt, lastActionAt: entity.lastActionAt, completedAt: entity.completedAt ?? null, guessCount: entity.guessCount, hintCount: entity.hintCount, outcome: entity.outcome, feedbackSubmittedAt: entity.feedbackSubmittedAt ?? null, createdAt: entity.createdAt, updatedAt: entity.updatedAt, ...(entity.dailyDate ? { dailyDate: entity.dailyDate } : {}), ...(entity.puzzleRevision ? { puzzleRevision: entity.puzzleRevision } : {}), ...(entity.rankingOutcome ? { rankingOutcome: entity.rankingOutcome } : {}) };
+  return { playerId: entity.playerId, playId: entity.playId, puzzleId: entity.puzzleId, puzzleNumber: entity.puzzleNumber, pool: entity.pool, context: entity.context, rankingEligible: entity.rankingEligible, identityKind: entity.identityKind === "anonymous" ? "anonymous" : "player", startedAt: entity.startedAt, lastActionAt: entity.lastActionAt, completedAt: entity.completedAt ?? null, guessCount: entity.guessCount, hintCount: entity.hintCount, outcome: entity.outcome, feedbackSubmittedAt: entity.feedbackSubmittedAt ?? null, createdAt: entity.createdAt, updatedAt: entity.updatedAt, ...(entity.dailyDate ? { dailyDate: entity.dailyDate } : {}), ...(entity.puzzleRevision ? { puzzleRevision: entity.puzzleRevision } : {}), ...(entity.rankingOutcome ? { rankingOutcome: entity.rankingOutcome } : {}) };
 }
 
 function playEntity(play: PuzzlePlay) {
@@ -437,8 +469,10 @@ export async function listPlays(playerId?: string, limit = 100_000) {
   return rows;
 }
 
-export async function startPlay(input: Omit<PuzzlePlay, "startedAt" | "lastActionAt" | "completedAt" | "guessCount" | "hintCount" | "outcome" | "feedbackSubmittedAt" | "createdAt" | "updatedAt">) {
-  const normalizedInput = input.context === "daily" ? { ...input, playId: canonicalDailyPlayId(input.puzzleId) } : input;
+export async function startPlay(input: Omit<PuzzlePlay, "identityKind" | "startedAt" | "lastActionAt" | "completedAt" | "guessCount" | "hintCount" | "outcome" | "feedbackSubmittedAt" | "createdAt" | "updatedAt"> & { identityKind?: PlayerIdentityKind }) {
+  const identityKind = input.identityKind === "anonymous" ? "anonymous" : "player";
+  const secured: Omit<PuzzlePlay, "startedAt" | "lastActionAt" | "completedAt" | "guessCount" | "hintCount" | "outcome" | "feedbackSubmittedAt" | "createdAt" | "updatedAt"> = { ...input, identityKind, rankingEligible: identityKind === "anonymous" ? false : input.rankingEligible };
+  const normalizedInput = secured.context === "daily" ? { ...secured, playId: canonicalDailyPlayId(secured.puzzleId) } : secured;
   const existing = await getPlay(normalizedInput.playerId, normalizedInput.playId);
   if (existing) {
     if (existing.puzzleId !== normalizedInput.puzzleId || existing.pool !== normalizedInput.pool || existing.context !== normalizedInput.context) throw new PlayConflictError("Play ID belongs to another attempt");
@@ -515,7 +549,7 @@ export async function applyPlayAction(action: PlayAction, clock: () => Date = ()
   throw new PlayConflictError("Play changed too many times");
 }
 
-export type FeedbackRecord = { puzzleId: string; puzzleNumber: number; puzzlePool: PuzzlePool; rating: "up" | "down"; comment: string | null; playId: string; anonymousSessionId: string; playerId?: string; displayName?: string; outcome: "solved" | "revealed"; guessCount: number; hintCount: number; metadataJson: string };
+export type FeedbackRecord = { puzzleId: string; puzzleNumber: number; puzzlePool: PuzzlePool; rating: "up" | "down"; comment: string | null; playId: string; anonymousSessionId: string; playerId?: string; identityKind?: PlayerIdentityKind; displayName?: string; outcome: "solved" | "revealed"; guessCount: number; hintCount: number; metadataJson: string };
 
 export async function insertFeedback(record: FeedbackRecord) {
   const createdAt = new Date().toISOString();
@@ -533,7 +567,7 @@ export async function insertFeedback(record: FeedbackRecord) {
 export async function listFeedback(limit = 250) {
   const items: Array<FeedbackRecord & { id: string; createdAt: string }> = [];
   for await (const entity of feedbackTable().listEntities<TableEntity & FeedbackRecord & { createdAt: string }>()) {
-    items.push({ id: entity.rowKey, createdAt: entity.createdAt, puzzleId: entity.puzzleId, puzzleNumber: entity.puzzleNumber, puzzlePool: entity.puzzlePool, rating: entity.rating, comment: entity.comment, outcome: entity.outcome, guessCount: entity.guessCount, hintCount: entity.hintCount, playId: entity.playId ?? "", anonymousSessionId: "", playerId: entity.playerId, displayName: entity.displayName, metadataJson: "" });
+    items.push({ id: entity.rowKey, createdAt: entity.createdAt, puzzleId: entity.puzzleId, puzzleNumber: entity.puzzleNumber, puzzlePool: entity.puzzlePool, rating: entity.rating, comment: entity.comment, outcome: entity.outcome, guessCount: entity.guessCount, hintCount: entity.hintCount, playId: entity.playId ?? "", anonymousSessionId: "", playerId: entity.playerId, identityKind: entity.identityKind === "anonymous" ? "anonymous" : "player", displayName: entity.displayName, metadataJson: "" });
   }
-  return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit).map((item) => ({ id: item.id, createdAt: item.createdAt, puzzleId: item.puzzleId, puzzleNumber: item.puzzleNumber, puzzlePool: item.puzzlePool, rating: item.rating, comment: item.comment ?? null, outcome: item.outcome, guessCount: item.guessCount, hintCount: item.hintCount, playerId: item.playerId ?? null, displayName: item.displayName ?? null, playId: item.playId }));
+  return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit).map((item) => ({ id: item.id, createdAt: item.createdAt, puzzleId: item.puzzleId, puzzleNumber: item.puzzleNumber, puzzlePool: item.puzzlePool, rating: item.rating, comment: item.comment ?? null, outcome: item.outcome, guessCount: item.guessCount, hintCount: item.hintCount, playerId: item.playerId ?? null, identityKind: item.identityKind ?? "player", displayName: item.identityKind === "anonymous" ? "Anonymous" : item.displayName ?? null, playId: item.playId }));
 }
