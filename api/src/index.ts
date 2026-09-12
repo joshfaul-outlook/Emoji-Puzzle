@@ -1,5 +1,5 @@
 import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from "@azure/functions";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomInt, randomUUID } from "node:crypto";
 import { adminConfigured, clearSessionCookie, createSessionCookie, isAdmin, passwordAccepted } from "./auth.js";
 import { body, json, requireAdmin, requireOrigin } from "./http.js";
 import { parseGameLaunchDate } from "./game-config.js";
@@ -74,7 +74,7 @@ export async function currentPuzzle(request: HttpRequest) {
     const challenge = Number.parseInt(request.query.get("challenge") ?? "", 10);
     const requested = Number.parseInt(request.query.get("puzzle") ?? "", 10);
     const isChallenge = Number.isInteger(challenge) && challenge >= 1 && challenge <= puzzles.length;
-    const position = isChallenge ? challenge : Number.isInteger(requested) && requested >= 1 ? requested : 1;
+    const position = isChallenge ? challenge : Number.isInteger(requested) && requested >= 1 ? requested : randomInt(puzzles.length) + 1;
     selected = puzzles[position - 1] ?? puzzles[0];
     context = isChallenge ? "challenge" : "practice";
   } else {

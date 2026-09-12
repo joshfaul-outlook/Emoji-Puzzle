@@ -21,9 +21,12 @@ import {
   toPublicPuzzle,
 } from "../lib/puzzles.ts";
 import {
+  advancePracticeProgress,
+  createPracticeProgress,
   getActiveMode,
   practicePlayStorageKey,
   restoreOpaquePlayId,
+  restorePracticePosition,
   restorePracticeProgress,
 } from "../lib/play-state.ts";
 import { LEGACY_PLAYER_IDENTITY_KEY, PLAYER_IDENTITY_KEY, migratePlayerIdentity, normalizePlayerName, playerHeaders, readPlayerIdentity, savePlayerIdentity } from "../lib/player-identity.ts";
@@ -226,13 +229,52 @@ test("restores only opaque attempt IDs from browser storage", () => {
   assert.equal(restoreOpaquePlayId(memoryStorage({ [key]: "broken" }), key), null);
 });
 
-test("restores valid practice progress and isolates replay cycles", () => {
+test("creates an independently shuffled Practice deck without repeats", () => {
+  const firstDevice = createPracticeProgress(4, 2, 0, () => 0);
+  const secondDevice = createPracticeProgress(4, 2, 0, () => 0.999);
+  assert.equal(firstDevice.position, 2);
+  assert.equal(secondDevice.position, 2);
+  assert.deepEqual(firstDevice.order.toSorted((left, right) => left - right), [1, 2, 3, 4]);
+  assert.deepEqual(secondDevice.order.toSorted((left, right) => left - right), [1, 2, 3, 4]);
+  assert.notDeepEqual(firstDevice.order, secondDevice.order);
+
+  const visited = [];
+  let progress = firstDevice;
+  for (let count = 0; count < 4; count += 1) {
+    visited.push(progress.position);
+    progress = advancePracticeProgress(progress, 4, () => 0.999);
+  }
+  assert.deepEqual(visited.toSorted((left, right) => left - right), [1, 2, 3, 4]);
+  assert.equal(progress.cycle, 1);
+  assert.notEqual(progress.position, visited.at(-1), "a reshuffle does not immediately repeat the last puzzle");
+});
+
+test("restores shuffled practice progress, migrates old positions, and isolates replay cycles", () => {
   const storage = memoryStorage({
-    "emoji-daily-practice-progress": JSON.stringify({ position: 17, cycle: 2 }),
+    "emoji-daily-practice-progress": JSON.stringify({ position: 3, cycle: 2, order: [3, 1, 2, 4] }),
   });
-  assert.deepEqual(restorePracticeProgress(storage, 330), { position: 17, cycle: 2 });
+  assert.deepEqual(restorePracticeProgress(storage, 4), { position: 3, cycle: 2, order: [3, 1, 2, 4] });
+  const legacy = memoryStorage({ "emoji-daily-practice-progress": JSON.stringify({ position: 2, cycle: 1 }) });
+  const migrated = restorePracticeProgress(legacy, 4, 1, () => 0.999);
+  assert.equal(migrated.position, 2);
+  assert.equal(migrated.cycle, 1);
+  assert.deepEqual(migrated.order.toSorted((left, right) => left - right), [1, 2, 3, 4]);
+  assert.equal(restorePracticePosition(legacy), 2);
   assert.notEqual(practicePlayStorageKey("practice-puzzle", 2), practicePlayStorageKey("practice-puzzle", 3));
-  assert.deepEqual(restorePracticeProgress(memoryStorage({ "emoji-daily-practice-progress": "broken" }), 330), { position: 1, cycle: 0 });
+  const recovered = restorePracticeProgress(memoryStorage({ "emoji-daily-practice-progress": "broken" }), 4, 3, () => 0.999);
+  assert.equal(recovered.position, 3);
+  assert.deepEqual(recovered.order.toSorted((left, right) => left - right), [1, 2, 3, 4]);
+});
+
+test("shuffles newly added Practice puzzles into the unplayed deck", () => {
+  const storage = memoryStorage({
+    "emoji-daily-practice-progress": JSON.stringify({ position: 3, cycle: 2, order: [1, 3, 2, 4] }),
+  });
+  const expanded = restorePracticeProgress(storage, 6, 1, () => 0);
+  assert.equal(expanded.position, 3);
+  assert.deepEqual(expanded.order.slice(0, 2), [1, 3], "already played positions stay consumed");
+  assert.deepEqual(expanded.order.slice(2).toSorted((left, right) => left - right), [2, 4, 5, 6]);
+  assert.notDeepEqual(expanded.order.slice(2), [2, 4, 5, 6], "new positions join the shuffled remainder");
 });
 
 test("defaults a new tab session to Daily and retains an explicit Practice selection", () => {

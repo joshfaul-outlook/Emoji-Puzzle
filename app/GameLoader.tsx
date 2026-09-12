@@ -5,6 +5,7 @@ import { DailyPuzzle, type ChallengeBenchmark } from "./DailyPuzzle";
 import type { PublicPuzzle } from "../lib/public-puzzle";
 import { KnowingMark } from "./components/KnowingMark";
 import { PlayerIdentityGate } from "./PlayerIdentityGate";
+import { restorePracticePosition } from "../lib/play-state";
 
 type LoaderMode = "daily" | "practice" | "next";
 
@@ -15,6 +16,10 @@ export function GameLoader({ mode }: { mode: LoaderMode }) {
   useEffect(() => {
     const parameters = new URLSearchParams(window.location.search);
     parameters.set("mode", mode);
+    if (mode === "practice" && !parameters.has("puzzle") && !parameters.has("challenge")) {
+      const savedPosition = restorePracticePosition(localStorage);
+      if (savedPosition !== null) parameters.set("puzzle", String(savedPosition));
+    }
     fetch(`/api/puzzles/current?${parameters.toString()}`, { headers: { accept: "application/json" } })
       .then(async (response) => {
         if (!response.ok) {

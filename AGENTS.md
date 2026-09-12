@@ -10,7 +10,7 @@ The core product question is whether we can repeatedly create puzzles that feel 
 
 - One globally shared puzzle per UTC day.
 - Every new browser-tab session opens in Daily mode; Practice is an explicit session choice.
-- Daily uses immutable UTC assignments initialized by deployment and never repeats a puzzle. Practice uses a separate append-only, player-unnumbered sequence of easier/pop-culture puzzles and never affects rankings.
+- Daily uses immutable UTC assignments initialized by deployment and never repeats a puzzle. Practice uses a separate append-only inventory of easier/pop-culture puzzles, shuffled independently on each device and unnumbered for players, and never affects rankings.
 - No password or conventional account is required. Email verification creates and recovers one persistent named player identity; each browser receives an independent opaque session.
 - The category is hidden until a hint or the result.
 - Guesses are free-form, deterministic, and unlimited.

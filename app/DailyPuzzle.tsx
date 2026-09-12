@@ -9,12 +9,15 @@ import {
 } from "../lib/public-puzzle";
 import {
   ACTIVE_MODE_KEY,
+  advancePracticeProgress,
+  createPracticeProgress,
   PRACTICE_PROGRESS_KEY,
   challengePlayStorageKey,
   getActiveMode,
   practicePlayStorageKey,
   restoreOpaquePlayId,
   restorePracticeProgress,
+  restorePracticePosition,
   type PlayState,
   type PracticeProgress,
   type Resolution,
@@ -94,7 +97,7 @@ export function DailyPuzzle({
   const [trackingMessage, setTrackingMessage] = useState("");
   const [dailyChanged, setDailyChanged] = useState(false);
   const pendingGuess = useRef<{ guess: string; operationId: string } | null>(null);
-  const [practiceProgress, setPracticeProgress] = useState<PracticeProgress>({ position: 1, cycle: 0 });
+  const [practiceProgress, setPracticeProgress] = useState<PracticeProgress>({ position: 1, cycle: 0, order: [1] });
   const inputRef = useRef<HTMLInputElement>(null);
   const sharePanelRef = useRef<HTMLDivElement>(null);
   const isFinished = play.outcome !== "playing" && play.resolution !== null;
@@ -108,14 +111,14 @@ export function DailyPuzzle({
         setPlayStorageKey("server-canonical");
       } else if (puzzle.context === "practice") {
         sessionStorage.setItem(ACTIVE_MODE_KEY, "practice");
-        const progress = restorePracticeProgress(localStorage, puzzle.sequenceLength);
+        const progress = restorePracticeProgress(localStorage, puzzle.sequenceLength, puzzle.sequenceNumber);
         if (resumePractice && progress.position !== puzzle.sequenceNumber) {
           window.location.replace(`/practice?puzzle=${progress.position}`);
           return;
         }
         const currentProgress = progress.position === puzzle.sequenceNumber
           ? progress
-          : { position: puzzle.sequenceNumber, cycle: progress.cycle };
+          : createPracticeProgress(puzzle.sequenceLength, puzzle.sequenceNumber, progress.cycle);
         localStorage.setItem(PRACTICE_PROGRESS_KEY, JSON.stringify(currentProgress));
         setPracticeProgress(currentProgress);
         const nextStorageKey = practicePlayStorageKey(puzzle.id, currentProgress.cycle);
@@ -194,8 +197,8 @@ export function DailyPuzzle({
   useEffect(() => {
     if (puzzle.context !== "daily") return;
     if (getActiveMode(sessionStorage) !== "practice") return;
-    const progress = restorePracticeProgress(localStorage, Number.MAX_SAFE_INTEGER);
-    window.location.replace(`/practice?puzzle=${progress.position}`);
+    const position = restorePracticePosition(localStorage);
+    window.location.replace(position === null ? "/practice" : `/practice?puzzle=${position}`);
   }, [puzzle.context]);
 
   useEffect(() => {
@@ -345,25 +348,21 @@ export function DailyPuzzle({
       window.location.replace("/");
       return;
     }
-    const progress = restorePracticeProgress(localStorage, Number.MAX_SAFE_INTEGER);
-    window.location.replace(`/practice?puzzle=${progress.position}`);
+    const position = restorePracticePosition(localStorage);
+    window.location.replace(position === null ? "/practice" : `/practice?puzzle=${position}`);
   }
 
   function advancePractice() {
-    const wraps = puzzle.sequenceNumber >= puzzle.sequenceLength;
-    const nextProgress = {
-      position: wraps ? 1 : puzzle.sequenceNumber + 1,
-      cycle: wraps ? practiceProgress.cycle + 1 : practiceProgress.cycle,
-    };
+    const nextProgress = advancePracticeProgress(practiceProgress, puzzle.sequenceLength);
     localStorage.setItem(PRACTICE_PROGRESS_KEY, JSON.stringify(nextProgress));
     sessionStorage.setItem(ACTIVE_MODE_KEY, "practice");
     window.location.replace(`/practice?puzzle=${nextProgress.position}`);
   }
 
   function returnToPractice() {
-    const progress = restorePracticeProgress(localStorage, Number.MAX_SAFE_INTEGER);
+    const position = restorePracticePosition(localStorage);
     sessionStorage.setItem(ACTIVE_MODE_KEY, "practice");
-    window.location.replace(`/practice?puzzle=${progress.position}`);
+    window.location.replace(position === null ? "/practice" : `/practice?puzzle=${position}`);
   }
 
   function shareUrl() {
