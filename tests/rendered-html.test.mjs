@@ -333,6 +333,10 @@ test("keeps answers and credentials out of public payloads and includes the iden
   assert.match(client, /Daily/);
   assert.match(client, /Practice/);
   assert.match(client, /Can you beat my result/);
+  assert.match(client, /Player menu/);
+  assert.match(client, /Switch player \/ clear data/);
+  assert.match(client, /href="\/startover\/"/);
+  assert.match(client, /aria-haspopup="menu"/);
   assert.match(client, /playerHeaders\(identity\)/);
   assert.match(client, /JSON\.stringify\(\{ playId: play\.playId \}\)/);
   assert.doesNotMatch(client, /JSON\.stringify\(play\)/);
@@ -376,6 +380,10 @@ test("keeps answers and credentials out of public payloads and includes the iden
   assert.match(feedbackAdmin, /Anonymous/);
   assert.match(statsUi, /You’re playing anonymously/);
   assert.match(statsUi, /Become a player/);
+  assert.match(startOverRoute, /player-sessions\/current/);
+  assert.match(startOverRoute, /localStorage\.clear\(\)/);
+  assert.match(startOverRoute, /sessionStorage\.clear\(\)/);
+  assert.match(startOverRoute, /document\.cookie/);
   assert.match(editor, /Saved and live/);
   assert.match(editor, /window\.location\.replace\(puzzleListReturnUrl\(returnTo, data\.number\)\)/);
   assert.match(editor, />Delete</);

@@ -59,6 +59,69 @@ type DailyPuzzleProps = {
   resumePractice?: boolean;
 };
 
+function PlayerMenu({
+  identity,
+  onOpenStats,
+  onSwitchPlayer,
+}: {
+  identity: BrowserIdentity;
+  onOpenStats: () => void;
+  onSwitchPlayer: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const firstItem = menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]');
+    firstItem?.focus();
+    const closeForOutsidePointer = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node) && !buttonRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const closeForEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault(); setOpen(false); buttonRef.current?.focus();
+    };
+    document.addEventListener("pointerdown", closeForOutsidePointer);
+    document.addEventListener("keydown", closeForEscape);
+    return () => { document.removeEventListener("pointerdown", closeForOutsidePointer); document.removeEventListener("keydown", closeForEscape); };
+  }, [open]);
+
+  function moveMenuFocus(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (!(["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key))) return;
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+    const current = items.indexOf(document.activeElement as HTMLButtonElement);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : event.key === "ArrowDown" ? (current + 1 + items.length) % items.length : (current - 1 + items.length) % items.length;
+    event.preventDefault(); items[next]?.focus();
+  }
+
+  const statsLabel = identity.kind === "anonymous" ? "Rankings" : "Stats & rankings";
+  const label = identity.kind === "anonymous" ? "Player" : identity.displayName;
+
+  return <div className="player-menu-wrap">
+    <button ref={buttonRef} className="player-chip player-menu-button" type="button" aria-haspopup="menu" aria-expanded={open} aria-controls="player-menu" onClick={() => setOpen((value) => !value)}>{label}<span aria-hidden="true">▾</span></button>
+    {open && <div ref={menuRef} className="player-menu" id="player-menu" role="menu" aria-label="Player menu" onKeyDown={moveMenuFocus}>
+      <button type="button" role="menuitem" onClick={() => { setOpen(false); buttonRef.current?.focus(); onOpenStats(); }}>{statsLabel}</button>
+      <button type="button" role="menuitem" className="player-menu-reset" onClick={() => { setOpen(false); buttonRef.current?.focus(); onSwitchPlayer(); }}>Switch player / clear data</button>
+    </div>}
+  </div>;
+}
+
+function SwitchPlayerDialog({ onClose }: { onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const element = dialog.current; const previousFocus = document.activeElement as HTMLElement | null;
+    element?.showModal();
+    return () => { element?.close(); previousFocus?.focus(); };
+  }, []);
+  return <dialog ref={dialog} className="stats-dialog switch-player-dialog" aria-labelledby="switch-player-title" onCancel={(event) => { event.preventDefault(); onClose(); }}>
+    <div className="stats-heading"><div><p className="stats-eyebrow">Device reset</p><h2 id="switch-player-title">Switch player?</h2></div><button className="stats-close" type="button" onClick={onClose} aria-label="Close switch player confirmation">✕</button></div>
+    <p>This clears this device’s game progress and player session. A named player can be recovered later with their email code.</p>
+    <div className="switch-player-actions"><a className="danger-button" href="/startover/">Switch player / clear data</a><button className="secondary-button" type="button" onClick={onClose}>Keep playing</button></div>
+  </dialog>;
+}
+
 export type ChallengeBenchmark = {
   outcome: "solved" | "revealed";
   guessCount: number;
@@ -84,6 +147,7 @@ export function DailyPuzzle({
   const [nextPuzzleCountdown, setNextPuzzleCountdown] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [switchPlayerOpen, setSwitchPlayerOpen] = useState(false);
   const [statsView, setStatsView] = useState<"daily" | "rankings" | "practice">(puzzle.context === "practice" ? "practice" : "daily");
   const [statsRefresh, setStatsRefresh] = useState(0);
   const [shareState, setShareState] = useState<"idle" | "shared" | "copied" | "error">("idle");
@@ -531,11 +595,12 @@ export function DailyPuzzle({
             </svg>
             <span>Share</span>
           </button>
-          <button className="player-chip player-stats-button" type="button" onClick={() => { setStatsView(identity.kind === "anonymous" ? "rankings" : puzzle.context === "practice" ? "practice" : "daily"); setStatsOpen(true); }} aria-label={identity.kind === "anonymous" ? "Anonymous play and rankings" : `Stats & rankings for ${identity.displayName}`} title={identity.kind === "anonymous" ? "Anonymous play and rankings" : "Stats & rankings"}>{identity.kind === "anonymous" ? <><span>Anonymous</span><span>Rankings</span></> : <><span className="player-chip-name">{identity.displayName}</span><span>Stats</span></>}</button>
+          <PlayerMenu identity={identity} onOpenStats={() => { setStatsView(identity.kind === "anonymous" ? "rankings" : puzzle.context === "practice" ? "practice" : "daily"); setStatsOpen(true); }} onSwitchPlayer={() => setSwitchPlayerOpen(true)} />
         </div>
       </header>
 
       {statsOpen && <PlayerStatsPanel identity={identity} initialView={statsView} onBecomePlayer={beginUpgrade} upgradeReady={upgradeReady} onClose={() => { setStatsOpen(false); setStatsRefresh((value) => value + 1); }} />}
+      {switchPlayerOpen && <SwitchPlayerDialog onClose={() => setSwitchPlayerOpen(false)} />}
 
       <nav className="mode-switch" aria-label="Game mode">
         <button
