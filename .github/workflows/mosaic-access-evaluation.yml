@@ -36,5 +36,5 @@ jobs:
         run: |
           principal_id="$(az ad sp show --id "$CLIENT_ID" --query id -o tsv)"
           if [ -z "$principal_id" ]; then echo 'Graph principal lookup unavailable'; exit 0; fi
-          az role assignment list --assignee-object-id "$principal_id" --scope /subscriptions/b6a2a094-793b-4f6d-87aa-9a79164a05b1/resourceGroups/emoji-daily-prod-rg --include-inherited --all --query '[].{role:roleDefinitionName,scope:scope}' -o json || true
+          az role assignment list --assignee-object-id "$principal_id" --scope /subscriptions/b6a2a094-793b-4f6d-87aa-9a79164a05b1/resourceGroups/emoji-daily-prod-rg --include-inherited --query '[].{role:roleDefinitionName,scope:scope}' -o json || true
           az rest --method get --url "https://graph.microsoft.com/v1.0/servicePrincipals/$principal_id/appRoleAssignments" --query 'value[].{appRoleId:appRoleId,resourceId:resourceId}' -o json || true
