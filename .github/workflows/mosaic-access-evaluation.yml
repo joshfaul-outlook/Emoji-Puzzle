@@ -1,0 +1,40 @@
+name: Read-only Azure access evaluation
+on:
+  push:
+    branches: [ops/mosaic-access-evaluation-20261008]
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Verify intended tenant and subscription
+        run: |
+          set -euo pipefail
+          test "$(az account show --query id -o tsv)" = b6a2a094-793b-4f6d-87aa-9a79164a05b1
+          test "$(az account show --query tenantId -o tsv)" = f24b6818-294b-40ec-9ae3-8b7ca680a209
+          echo 'Verified expected Azure tenant and subscription'
+      - name: Read reference resource groups
+        run: |
+          for group in drawsomeone-prod-rg emoji-daily-prod-rg msg1-dev-centralus; do
+            echo "Checking $group"
+            az group show -n "$group" --query '{id:id,location:location}' -o json || true
+          done
+      - name: Read effective subscription permissions
+        run: |
+          az rest --method get --url 'https://management.azure.com/subscriptions/b6a2a094-793b-4f6d-87aa-9a79164a05b1/providers/Microsoft.Authorization/permissions?api-version=2022-04-01' --query 'value[].{actions:actions,notActions:notActions}' -o json || true
+      - name: Read scoped role assignments and directory application grants
+        env:
+          CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        run: |
+          principal_id="$(az ad sp show --id "$CLIENT_ID" --query id -o tsv)"
+          if [ -z "$principal_id" ]; then echo 'Graph principal lookup unavailable'; exit 0; fi
+          az role assignment list --assignee-object-id "$principal_id" --scope /subscriptions/b6a2a094-793b-4f6d-87aa-9a79164a05b1/resourceGroups/emoji-daily-prod-rg --include-inherited --all --query '[].{role:roleDefinitionName,scope:scope}' -o json || true
+          az rest --method get --url "https://graph.microsoft.com/v1.0/servicePrincipals/$principal_id/appRoleAssignments" --query 'value[].{appRoleId:appRoleId,resourceId:resourceId}' -o json || true
